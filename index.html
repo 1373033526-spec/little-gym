@@ -419,6 +419,7 @@
     font-variant-numeric: tabular-nums; outline: none;
     transition: border-color 0.2s;
     -moz-appearance: textfield;
+    appearance: textfield; /* 新增这一行！标准属性，消除警告 */
   }
   .num-input:focus { border-color: #34C759; }
   .num-input::-webkit-outer-spin-button,
@@ -527,38 +528,6 @@
   }
   .add-btn:active { transform: scale(0.92); }
   .settings-list { display: flex; flex-direction: column; gap: 10px; }
-  /* 版本号（设置页底部，点击检查更新） */
-  .settings-version {
-    text-align: center; color: #c7c7cc; font-size: 12px;
-    padding: 28px 0 10px; cursor: pointer; user-select: none;
-    line-height: 1.6;
-  }
-  .settings-version:active { color: #86868b; }
-  /* 设置项卡片（开关行） */
-  .settings-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
-  .option-row {
-    background: #ffffff; border: 1px solid #e5e5ea; border-radius: 14px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-  }
-  .option-info { flex: 1; min-width: 0; }
-  .option-title { font-size: 16px; font-weight: 600; color: #1d1d1f; display: flex; align-items: center; gap: 7px; }
-  .option-title i { color: #34C759; font-size: 17px; }
-  .option-sub { font-size: 12px; color: #86868b; margin-top: 3px; line-height: 1.5; }
-  /* iOS 风开关 */
-  .switch { position: relative; width: 50px; height: 30px; flex-shrink: 0; }
-  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
-  .switch-slider {
-    position: absolute; inset: 0; background: #e5e5ea; border-radius: 30px;
-    transition: background 0.22s; pointer-events: none;
-  }
-  .switch-slider::before {
-    content: ''; position: absolute; top: 2px; left: 2px;
-    width: 26px; height: 26px; background: #fff; border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.22); transition: transform 0.22s cubic-bezier(0.3, 0.9, 0.4, 1.2);
-  }
-  .switch input:checked + .switch-slider { background: #34C759; }
-  .switch input:checked + .switch-slider::before { transform: translateX(20px); }
 
   .part-section {
     background: #ffffff; border-radius: 14px; overflow: hidden;
@@ -573,14 +542,12 @@
     font-size: 18px; cursor: pointer;
   }
   .part-section-head {
-    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.3, 1);
+    transition: transform 0.3s ease;
     background: #ffffff; position: relative; z-index: 1;
     display: flex; align-items: center; padding: 14px 16px;
     cursor: pointer; gap: 12px; user-select: none;
-    touch-action: pan-y; /* 纵向滚动交给浏览器，横向由 JS 接管 */
-    will-change: transform;
   }
-  .part-section-head.swipe-open { transform: translate3d(-80px, 0, 0); }
+  .part-section-head.swipe-open { transform: translateX(-80px); }
   .part-section-head.swipe-drag { transition: none; }
   .part-section-icon {
     width: 36px; height: 36px; border-radius: 10px;
@@ -876,21 +843,8 @@
       </div>
       <div class="view-body">
         <div class="container">
-          <div class="settings-options">
-            <div class="option-row">
-              <div class="option-info">
-                <div class="option-title"><i data-ic="vibrate"></i> 震动提醒</div>
-                <div class="option-sub">准备倒计时最后 3 秒、休息结束时震动（iPhone 不支持网页震动）</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="vibration-toggle" onchange="setVibrationEnabled(this.checked)">
-                <span class="switch-slider"></span>
-              </label>
-            </div>
-          </div>
           <div class="settings-list" id="settings-list"></div>
           <div class="empty-tip" id="settings-empty" style="display:none;color:#86868b;text-align:center;padding:40px 0">还没有动作，点击「+ 添加」创建</div>
-          <div class="settings-version" id="settings-version" onclick="checkUpdate()"></div>
         </div>
       </div>
     </div>
@@ -1049,8 +1003,7 @@ const ICONS = {
   grip: '<circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/>',
   dumbbell: '<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1M3 3l1 1"/><path d="m18 22 4-4M2 6l4-4"/><path d="m3 10 7-7M14 21l7-7"/>',
   expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
-  compress: '<path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>',
-  vibrate: '<path d="m2 8 2 2-2 2 2 2-2 2"/><path d="m22 8-2 2 2 2-2 2 2 2"/><rect x="8" y="5" width="8" height="14" rx="1.5"/>'
+  compress: '<path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>'
 };
 function icon(name) {
   return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.box) + '</svg>';
@@ -1107,21 +1060,12 @@ function getOrderedParts() {
 }
 
 /* ============================================================
-   应用版本
-   ⚠️ 每次部署前必须 +1（与 sw.js 顶部的 APP_VERSION 保持一致），
-   设置页底部展示该版本号，用于确认手机上是否已是最新版。
-   规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
-   ============================================================ */
-const APP_VERSION = '1.2.0';
-
-/* ============================================================
    数据层
    ============================================================ */
 const ACTIONS_KEY_V3 = 'training_actions_v3';
 const ACTIONS_KEY_V2 = 'training_actions_v2';
 const ACTIONS_KEY_V1 = 'training_actions_v1';
 const RECORDS_KEY = 'training_records_v1';
-const VIBRATION_KEY = 'gym_vibration_enabled'; // 震动开关（默认开）
 
 function getActions() {
   try { return JSON.parse(localStorage.getItem(ACTIONS_KEY_V3)) || []; }
@@ -1820,7 +1764,7 @@ function startPrepareTimer() {
     training.prepareSeconds -= 1;
     // 最后3秒震动提醒
     if (training.prepareSeconds <= 3 && training.prepareSeconds > 0) {
-      buzz(100);
+      if (navigator.vibrate) navigator.vibrate(100);
     }
     if (training.prepareSeconds <= 0) {
       // 倒计时结束：震动 + 自动进入训练正计时
@@ -1883,27 +1827,11 @@ function startRestTimer() {
   }, 1000);
 }
 
-/* 震动开关（默认开启；iOS Safari 不支持 Vibration API） */
-function isVibrationEnabled() {
-  return localStorage.getItem(VIBRATION_KEY) !== '0';
-}
-function setVibrationEnabled(on) {
-  localStorage.setItem(VIBRATION_KEY, on ? '1' : '0');
-  const t = document.getElementById('vibration-toggle');
-  if (t) t.checked = on;
-  // 开启时给一下确认震动，让用户立刻感知
-  if (on) buzz(120);
-}
-/* 统一震动入口：受开关控制，不支持时静默 */
-function buzz(pattern) {
-  if (isVibrationEnabled() && navigator.vibrate) {
-    try { navigator.vibrate(pattern); } catch(e) {}
-  }
-}
-
-/* 震动反馈（Web Vibration API + 视觉降级，视觉抖动始终保留） */
+/* 震动反馈（Web Vibration API + 视觉降级） */
 function triggerVibration() {
-  buzz([200, 100, 200]);
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
+  }
   const timerEl = document.getElementById('tr-timer');
   timerEl.classList.add('shake-alert');
   setTimeout(() => timerEl.classList.remove('shake-alert'), 1500);
@@ -2024,7 +1952,7 @@ function renderSettings() {
       <div class="part-section ${isExpanded ? 'expanded' : ''}" data-part="${p.name}" data-part-idx="${partIdx}">
         <div class="part-swipe-wrap">
           <div class="part-swipe-delete" onclick="askDeletePart('${p.name}')">${icon('trash')}</div>
-          <div class="part-section-head" draggable="true" onclick="onPartHeadClick(this, '${p.name}')" ondragstart="onPartDragStart(event, '${p.name}')" ondragover="onPartDragOver(event, '${p.name}')" ondrop="onPartDrop(event, '${p.name}')" ondragend="onPartDragEnd(event)" ontouchstart="onPartSwipeStart(event, '${p.name}')" ontouchmove="onPartSwipeMove(event, '${p.name}')" ontouchend="onPartSwipeEnd(event, '${p.name}')" ontouchcancel="onPartSwipeEnd(event, '${p.name}')">
+          <div class="part-section-head" draggable="true" onclick="togglePartSection('${p.name}')" ondragstart="onPartDragStart(event, '${p.name}')" ondragover="onPartDragOver(event, '${p.name}')" ondrop="onPartDrop(event, '${p.name}')" ondragend="onPartDragEnd(event)" ontouchstart="onPartSwipeStart(event)" ontouchmove="onPartSwipeMove(event, '${p.name}')" ontouchend="onPartSwipeEnd(event, '${p.name}')">
             <div class="drag-handle part-drag-handle">${icon('grip')}</div>
             <div class="part-section-icon">${icon(p.icon)}</div>
             <div class="part-section-info">
@@ -2310,94 +2238,46 @@ function askDelete(id) {
   });
 }
 
-/* ===== 部位左滑删除（手势状态机） =====
-   关键点：
-   - 位移以「手势开始时的位置」为基准（base），展开态右滑也能跟手；
-   - 首次明显移动时锁定方向，纵向交给页面滚动，横向才接管；
-   - 松手按「速度（轻扫）+ 位置（过半）」对称吸附，左右手感一致；
-   - 横向滑动后抑制合成 click，避免误触展开/折叠。 */
-const SWIPE_ACTION_W = 80;          // 删除按钮宽度（与 CSS 一致）
-const SWIPE_LOCK_PX = 8;            // 方向判定阈值（越小越灵敏）
-const SWIPE_FLICK_V = 0.35;         // 轻扫速度阈值 px/ms
-let swipeGesture = null;
+/* 部位左滑删除 */
+let partSwipeStartX = 0;
+let partSwipeOpenPart = null;
 
-function onPartSwipeStart(e, partName) {
+function onPartSwipeStart(e) {
   const touch = e.touches[0];
-  const el = e.currentTarget;
-  const base = el.classList.contains('swipe-open') ? -SWIPE_ACTION_W : 0;
-  swipeGesture = {
-    el, partName,
-    startX: touch.clientX, startY: touch.clientY,
-    base, x: base,
-    axis: null,                       // null | 'x' | 'y'
-    samples: []                       // 最近移动采样 {x, t}，用于松手速度
-  };
-  el.classList.add('swipe-drag');
-  // 关闭其他已展开的行（带动画回收）
-  document.querySelectorAll('.part-section-head.swipe-open').forEach(other => {
-    if (other !== el) other.classList.remove('swipe-open');
+  partSwipeStartX = touch.clientX;
+  e.currentTarget.classList.add('swipe-drag');
+  // 关闭其他已展开的滑动
+  document.querySelectorAll('.part-section-head.swipe-open').forEach(el => {
+    if (el !== e.currentTarget) {
+      el.classList.remove('swipe-open');
+      el.classList.remove('swipe-drag');
+    }
   });
 }
 
 function onPartSwipeMove(e, partName) {
-  const g = swipeGesture;
-  if (!g || g.el !== e.currentTarget) return;
   const touch = e.touches[0];
-  const dx = touch.clientX - g.startX;
-  const dy = touch.clientY - g.startY;
-
-  // 首次移动：锁定方向
-  if (!g.axis) {
-    if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return;
-    g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-  }
-  if (g.axis === 'y') return; // 纵向：不拦截，页面正常滚动
-
-  e.preventDefault();
-  // 以 base 为基准跟手，钳制在 [-80, 0]
-  const x = Math.max(-SWIPE_ACTION_W, Math.min(0, g.base + dx));
-  g.x = x;
-  // 记录最近 80ms 移动采样，松手时算窗口平均速度（px/ms）
-  const now = Date.now();
-  g.samples.push({ x, t: now });
-  while (g.samples.length > 2 && now - g.samples[0].t > 80) g.samples.shift();
-  g.el.style.transform = `translate3d(${x}px, 0, 0)`;
+  const dx = touch.clientX - partSwipeStartX;
+  // 只允许左滑（负方向），最多80px
+  const offset = Math.max(-80, Math.min(0, dx));
+  e.currentTarget.style.transform = `translateX(${offset}px)`;
+  // 阻止垂直滚动
+  if (dx < -10) e.preventDefault();
 }
 
 function onPartSwipeEnd(e, partName) {
-  const g = swipeGesture;
-  if (!g || g.el !== e.currentTarget) return;
-  swipeGesture = null;
-  const el = g.el;
+  const touch = e.changedTouches[0];
+  const dx = touch.clientX - partSwipeStartX;
+  const el = e.currentTarget;
   el.classList.remove('swipe-drag');
   el.style.transform = '';
-
-  if (g.axis !== 'x') return; // 纵向滚动/轻点：保持原状
-
-  // 松手速度：最近窗口内的平均速度（短手势也能准确反映轻扫）
-  let vel = 0;
-  const s = g.samples;
-  if (s.length >= 2) {
-    const dt = s[s.length - 1].t - s[0].t;
-    if (dt > 0) vel = (s[s.length - 1].x - s[0].x) / dt;
+  if (dx < -40) {
+    el.classList.add('swipe-open');
+    partSwipeOpenPart = partName;
+  } else {
+    el.classList.remove('swipe-open');
+    if (partSwipeOpenPart === partName) partSwipeOpenPart = null;
   }
-  // 对称吸附：快速轻扫按方向定，否则按是否过半
-  const shouldOpen = vel <= -SWIPE_FLICK_V
-    ? true
-    : vel >= SWIPE_FLICK_V
-      ? false
-      : g.x < -SWIPE_ACTION_W / 2;
-  el.classList.toggle('swipe-open', shouldOpen);
-
-  // 抑制滑动后合成的 click（超过 10px 的横向位移视为滑动而非点击）
-  if (Math.abs(g.x - g.base) > 10) el.dataset.swiped = '1';
-}
-
-/* 头部点击：滑动后的 click 吞掉；展开态轻点改为收回删除按钮 */
-function onPartHeadClick(el, partName) {
-  if (el.dataset.swiped === '1') { el.dataset.swiped = '0'; return; }
-  if (el.classList.contains('swipe-open')) { el.classList.remove('swipe-open'); return; }
-  togglePartSection(partName);
 }
 
 function askDeletePart(partName) {
@@ -2654,22 +2534,6 @@ window.addEventListener('appinstalled', () => {
     });
   }
 })();
-
-/* ===== 版本号展示 + 检查更新 =====
-   设置页底部显示当前版本；点击后整页刷新——
-   Service Worker 对页面导航是「在线取最新」策略，
-   所以在线刷新即可拿到最新部署的版本，版本号会随之变化。 */
-(function initVersion() {
-  const el = document.getElementById('settings-version');
-  if (el) el.innerHTML = 'Little GYM <b>v' + APP_VERSION + '</b><br>点击检查更新';
-  // 震动开关初始状态
-  const vt = document.getElementById('vibration-toggle');
-  if (vt) vt.checked = isVibrationEnabled();
-})();
-function checkUpdate() {
-  showToast('正在检查更新…');
-  setTimeout(() => location.reload(), 500);
-}
 
 /* ===== PWA：注册 Service Worker（离线缓存） =====
    浏览器限制：Service Worker 只能在 HTTPS 或 localhost 下注册。

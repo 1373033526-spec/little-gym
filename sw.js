@@ -1,8 +1,5 @@
 /* Little GYM Service Worker — 离线优先（cache-first） */
-/* ⚠️ 每次部署前必须 +1，并与 index.html 里的 APP_VERSION 保持一致。
-   版本号变化会触发 SW 更新并自动清掉旧版缓存。 */
-const APP_VERSION = '1.2.0';
-const CACHE = 'little-gym-v' + APP_VERSION;
+const CACHE = 'little-gym-v4';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
