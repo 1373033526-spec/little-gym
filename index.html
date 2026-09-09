@@ -1,0 +1,2709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Little GYM">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<title>组间训练计时器</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2334C759'/%3E%3Ctext x='90' y='125' font-size='90' text-anchor='middle' fill='white' font-family='Arial'%3E💪%3C/text%3E%3C/svg%3E">
+  <style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1d1d1f;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ===== 手机框架（默认移动端全屏） ===== */
+  .phone {
+    width: 100vw;
+    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100); /* JS 实时修正：兼容移动浏览器地址栏 */
+    height: 100dvh;
+    background: #ffffff;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    overflow: hidden;
+    position: relative;
+  }
+  .phone::before { display: none; }
+  .screen {
+    width: 100%; height: 100%;
+    position: relative;
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    overscroll-behavior: none;
+  }
+
+  /* ===== 桌面端：显示手机模拟框架 ===== */
+  @media (min-width: 481px) and (pointer: fine) {
+    body { background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 100%); padding: 20px; }
+    .phone {
+      width: 390px;
+      height: 844px;
+      border-radius: 44px;
+      border: 10px solid #d2d2d7;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.12), 0 0 0 2px #ffffff;
+    }
+    .phone::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 50%; transform: translateX(-50%);
+      width: 140px; height: 28px;
+      background: #000;
+      border-radius: 0 0 18px 18px;
+      z-index: 100;
+    }
+    .screen { padding-top: 36px; }
+  }
+  /* 平板/手机（触屏）：全屏并锁死根滚动，滑动只发生在应用内部，不触发浏览器地址栏收起 */
+  @media (pointer: coarse) {
+    html, body { height: 100%; overflow: hidden; }
+    body { background: #ffffff !important; padding: 0 !important; min-height: 0 !important; }
+    .phone {
+      width: 100vw !important;
+      height: calc(var(--vh, 1vh) * 100) !important;
+      height: 100dvh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .phone::before { display: none !important; }
+    .screen { padding-top: env(safe-area-inset-top) !important; }
+  }
+
+  /* ===== 通用（app-shell：视图固定一屏，头部不动，内容区内部滚动；
+     滚动体不与视口边缘齐平，不会被浏览器提升为根滚动器，地址栏不收起） ===== */
+  .view { display: none; }
+  .view.active {
+    display: flex; flex-direction: column;
+    position: absolute; inset: 0;
+    overflow: hidden; background: #ffffff;
+  }
+  .view-head { flex-shrink: 0; }
+  .view-head .container { padding-bottom: 0; }
+  .view-body {
+    flex: 1; min-height: 0;
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .view-body::-webkit-scrollbar { width: 0; }
+  .view-body .container { padding-top: 0; padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+  .container { padding: 20px 16px 40px; }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px 20px;
+  }
+  .title { font-size: 26px; font-weight: 700; color: #1d1d1f; white-space: nowrap; }
+  .header { gap: 8px; }
+  .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .icon-btn {
+    font-size: 20px; line-height: 1;
+    padding: 8px 8px;
+    background: #f5f5f7;
+    border: none;
+    border-radius: 10px;
+    color: #86868b;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .icon-btn:active { transform: scale(0.92); }
+  /* 窄屏：标题与按钮再压缩，保证单行 */
+  @media (max-width: 360px) {
+    .title { font-size: 22px; }
+    .header-actions { gap: 6px; }
+    .icon-btn { font-size: 19px; padding: 7px 8px; }
+  }
+  @media (max-width: 340px) {
+    .title { font-size: 20px; }
+    .header-actions { gap: 4px; }
+    .icon-btn { font-size: 18px; padding: 6px 6px; }
+  }
+
+  /* ===== 内联 SVG 图标（随字号缩放，零外链） ===== */
+  svg.ic {
+    width: 1em; height: 1em;
+    fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    vertical-align: -0.15em;
+    flex-shrink: 0;
+  }
+
+  /* ===== 历史页 - 月历看板 ===== */
+  .calendar-wrap {
+    background: #ffffff; border-radius: 16px;
+    border: 1px solid #e5e5ea; padding: 16px; margin-bottom: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .cal-nav {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .cal-month-title { font-size: 17px; font-weight: 600; color: #1d1d1f; }
+  .cal-nav-btn {
+    background: #f5f5f7; border: 1px solid #e5e5ea; color: #86868b;
+    border-radius: 8px; padding: 6px 14px; font-size: 16px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cal-nav-btn:active { transform: scale(0.92); }
+  .cal-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 4px; margin-bottom: 8px;
+  }
+  .cal-weekday {
+    text-align: center; font-size: 12px; color: #aeaeb2;
+    padding: 4px 0;
+  }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-day {
+    aspect-ratio: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 15px; color: #86868b;
+    background: #f5f5f7; border: 1px solid transparent;
+    cursor: pointer; transition: all 0.15s;
+    font-variant-numeric: tabular-nums;
+  }
+  .cal-day:active { transform: scale(0.92); }
+  .cal-day.empty { background: transparent; cursor: default; }
+  .cal-day.today { border-color: #007AFF; color: #007AFF; font-weight: 600; }
+  .cal-day.has-training {
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    color: #fff; font-weight: 600;
+  }
+  .cal-day.has-training.today { box-shadow: 0 0 0 2px #fff inset; }
+  .cal-day.selected { outline: 2px solid #1d1d1f; outline-offset: -2px; }
+  .cal-day .cal-day-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: rgba(255,255,255,0.7); margin-top: 2px;
+  }
+
+  /* 日期详情 */
+  .day-detail {
+    background: #ffffff; border-radius: 14px; padding: 16px;
+    border: 1px solid #e5e5ea; animation: slideUp 0.25s ease-out;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .day-detail-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .day-detail-title { font-size: 16px; font-weight: 600; color: #34C759; }
+  .day-detail-summary { font-size: 13px; color: #86868b; }
+  .detail-part { margin-bottom: 16px; }
+  .detail-part:last-child { margin-bottom: 0; }
+  .detail-part-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 600; color: #1d1d1f;
+    padding-bottom: 6px; border-bottom: 1px solid #e5e5ea;
+    margin-bottom: 8px;
+  }
+  .detail-action { margin-bottom: 10px; }
+  .detail-action:last-child { margin-bottom: 0; }
+  .detail-action-name {
+    font-size: 14px; color: #3a3a3c; margin-bottom: 6px;
+    display: flex; justify-content: space-between;
+  }
+  .detail-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .detail-set {
+    background: #f5f5f7; border: 1px solid #e5e5ea;
+    border-radius: 8px; padding: 4px 10px; font-size: 12px;
+    color: #636366; font-variant-numeric: tabular-nums;
+  }
+  .detail-set .set-num { color: #34C759; font-weight: 600; }
+  .detail-empty { text-align: center; color: #c7c7cc; padding: 20px 0; font-size: 13px; }
+
+  /* ===== 首页 - 部位卡片 ===== */
+  .part-list { display: flex; flex-direction: column; gap: 14px; }
+  .part-card {
+    background: #ffffff; border-radius: 16px;
+    border: 1px solid #e5e5ea; overflow: hidden;
+    transition: all 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .part-card:active { transform: scale(0.98); }
+  .part-head {
+    display: flex; align-items: center; padding: 16px 18px;
+    cursor: pointer; gap: 14px;
+  }
+  .part-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
+  }
+  .part-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .part-name { font-size: 18px; font-weight: 600; color: #1d1d1f; }
+  .part-count { font-size: 13px; color: #86868b; }
+  .part-arrow { font-size: 16px; color: #34C759; transition: transform 0.2s; }
+  .part-card.expanded .part-arrow { transform: rotate(90deg); }
+  .part-actions {
+    display: none; padding: 0 18px 14px;
+    flex-direction: column; gap: 8px;
+  }
+  .part-card.expanded .part-actions { display: flex; }
+  .part-action-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f5f5f7; border-radius: 10px; padding: 10px 14px;
+  }
+  .part-action-name { font-size: 14px; color: #3a3a3c; }
+  .part-action-defaults { font-size: 12px; color: #aeaeb2; }
+  .part-start-btn {
+    width: calc(100% - 36px); margin: 8px 18px 16px;
+    padding: 12px 0; border-radius: 12px; border: none;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .part-start-btn:active { transform: scale(0.97); }
+  .footer { text-align: center; padding-top: 30px; }
+  .footer-text { color: #d1d1d6; font-size: 13px; }
+  .install-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 14px; margin-bottom: 12px;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    color: #fff; border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .install-btn:active { transform: scale(0.96); }
+  /* 离线不可用提示卡（HTTP 局域网访问时显示） */
+  .offline-hint {
+    text-align: left;
+    background: #fff8f0;
+    border: 1px solid #ffe0b2;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .offline-hint-title { font-size: 14px; font-weight: 700; color: #b25000; margin-bottom: 6px; }
+  .offline-hint-body { font-size: 13px; color: #8a5a2a; line-height: 1.7; }
+  .offline-hint-body code {
+    background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px;
+    font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  /* ===== 训练板块（内含「启动页 hub」与「计时页 session」两个子态） ===== */
+  /* 底部为标签栏留出空间（标签栏高 ≈ 64 + 底部安全区/24px，另留 6px 呼吸） */
+  #view-training.active {
+    padding-bottom: calc(70px + max(24px, env(safe-area-inset-bottom, 0px)));
+  }
+  /* 启动页：可滚动列表 */
+  .training-hub {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .training-hub .container { padding-bottom: 12px; }
+  /* 计时页：固定不滚动 */
+  .training-container {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  #view-training.mode-hub .training-hub { display: block; }
+  #view-training.mode-session .training-container { display: flex; }
+
+  /* 启动页：进行中训练卡片 */
+  .ongoing-card {
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    border-radius: 16px; padding: 18px; color: #fff;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 20px rgba(52,199,89,0.25);
+  }
+  .ongoing-title { font-size: 13px; font-weight: 600; opacity: 0.9; }
+  .ongoing-main { font-size: 19px; font-weight: 700; margin: 6px 0 2px; }
+  .ongoing-status { font-size: 14px; opacity: 0.92; font-variant-numeric: tabular-nums; }
+  .ongoing-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .ongoing-btn {
+    flex: 1; padding: 11px 0; border-radius: 12px; border: none;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .ongoing-btn:active { transform: scale(0.97); }
+  .ongoing-resume { background: #ffffff; color: #248a3d; }
+  .ongoing-end { background: rgba(255,255,255,0.22); color: #ffffff; }
+
+  /* 启动页：部位开始行 */
+  .hub-list { display: flex; flex-direction: column; gap: 10px; }
+  .hub-part {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; background: #ffffff;
+    border: 1px solid #e5e5ea; border-radius: 14px;
+    padding: 14px 16px; cursor: pointer; text-align: left;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    transition: transform 0.15s;
+  }
+  .hub-part:active { transform: scale(0.98); }
+  .hub-part-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .hub-part-name { font-size: 16px; font-weight: 600; color: #1d1d1f; }
+  .hub-part-count { font-size: 12px; color: #86868b; }
+  .hub-part-go {
+    background: #e8f5e9; color: #34C759; border: none; border-radius: 16px;
+    padding: 7px 18px; font-size: 13px; font-weight: 600; flex-shrink: 0;
+  }
+  .hub-empty {
+    text-align: center; color: #86868b; font-size: 15px;
+    padding: 70px 20px; line-height: 1.7;
+  }
+  .hub-empty-sub { font-size: 13px; color: #aeaeb2; margin-top: 6px; }
+  /* 计时页顶部信息条：部位 + 动作 + 组数（单行精简） */
+  .session-info {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 2px 12px; flex-shrink: 0;
+  }
+  .si-part {
+    font-size: 12px; font-weight: 600; color: #34C759;
+    background: #e8f5e9; padding: 4px 12px; border-radius: 12px;
+    flex-shrink: 0;
+  }
+  .si-name {
+    flex: 1; min-width: 0;
+    font-size: clamp(16px, 4.6vw, 19px); font-weight: 700; color: #1d1d1f;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .si-group {
+    font-size: 12px; color: #86868b; background: #f5f5f7;
+    padding: 4px 12px; border-radius: 12px; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .adjust-area { display: flex; justify-content: space-around; padding: 16px 0 12px; gap: 16px; flex-shrink: 0; }
+  .adjust-item { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+  .adjust-label { font-size: 14px; color: #86868b; margin-bottom: 8px; }
+  .number-control { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2vw, 14px); max-width: 100%; }
+  .num-btn {
+    width: clamp(34px, 9.5vw, 44px); height: clamp(34px, 9.5vw, 44px); border-radius: 50%;
+    background: #f0f0f2; border: none; color: #1d1d1f;
+    font-size: 22px; font-weight: 300; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .num-btn:active { background: #e5e5ea; transform: scale(0.9); }
+  .num-display {
+    font-size: clamp(26px, 8vw, 32px); font-weight: 700; color: #1d1d1f;
+    min-width: 56px; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .num-input {
+    width: clamp(52px, 16vw, 80px); min-width: 0; text-align: center;
+    font-size: clamp(24px, 7vw, 30px); font-weight: 700; color: #1d1d1f;
+    background: #f5f5f7; border: 1px solid #e5e5ea;
+    border-radius: 10px; padding: 6px 4px;
+    font-variant-numeric: tabular-nums; outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .num-input:focus { border-color: #34C759; }
+  .num-input::-webkit-outer-spin-button,
+  .num-input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .num-unit { font-size: 13px; color: #aeaeb2; margin-top: 4px; }
+
+  .record-btn {
+    width: 100%; padding: 16px 0; border-radius: 16px;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    border: none; margin: 4px 0 8px; cursor: pointer;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .record-btn:active { transform: scale(0.97); }
+  .record-btn:disabled { background: #e5e5ea; opacity: 0.6; cursor: not-allowed; }
+  .record-btn-text { font-size: 18px; font-weight: 600; color: #fff; }
+
+  .timer-area {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #f5f5f7; border-radius: 20px; margin: 4px 0 8px;
+    flex: 1 1 auto; min-height: 88px; position: relative; border: 1px solid #e5e5ea;
+    cursor: pointer; overflow: hidden;
+  }
+  .timer-display { padding: clamp(2px, 1.2vh, 10px) 0; }
+  .timer-number {
+    font-size: clamp(40px, 11vw, 72px); font-weight: 700; color: #34C759;
+    font-variant-numeric: tabular-nums; letter-spacing: 2px;
+    line-height: 1.1;
+  }
+  .timer-status { margin-top: 4px; }
+  .timer-label { font-size: clamp(14px, 2.6vh, 18px); color: #86868b; }
+  .timer-hint { font-size: 12px; color: #d1d1d6; margin-top: 8px; }
+  .timer-sub {
+    font-size: 13px; color: #86868b; margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-sub span { color: #34C759; font-weight: 600; }
+  /* 15秒震动提醒 */
+  .shake-alert { animation: shake 0.5s ease-in-out 3; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+  .timer-area.warning { border-color: #FF9500; background: #fff8f0; }
+  .timer-area.warning .timer-number { color: #FF9500; }
+
+  .ready-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(245,245,247,0.88); border-radius: 20px;
+  }
+  .ready-number {
+    font-size: clamp(64px, 20vw, 110px); font-weight: 800; color: #34C759;
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+  }
+  .rest-finished-pulse { animation: finishedPulse 0.6s ease-out; }
+  @keyframes finishedPulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,199,89,0.6); }
+    100% { box-shadow: 0 0 0 30px rgba(52,199,89,0); }
+  }
+
+  .bottom-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 8px; flex-shrink: 0; }
+  .nav-btn {
+    flex: 1; padding: 12px 0; border-radius: 12px; border: none;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    background: #f0f0f2; color: #636366; transition: all 0.15s;
+  }
+  .nav-btn:active { transform: scale(0.95); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .next-btn { background: #e8f5e9; color: #34C759; }
+  .end-btn { background: #fff0f0; color: #ff3b30; }
+
+  /* 矮屏设备（如 iPhone SE 568px 高）：压缩计时页各区，保证底部按钮不被挤出 */
+  @media (max-height: 640px) {
+    .session-info { padding: 2px 2px 6px; }
+    .si-part, .si-group { padding: 2px 9px; }
+    .si-name { font-size: 15px; }
+    .adjust-area { padding: 6px 0 4px; gap: 10px; }
+    .adjust-label { margin-bottom: 4px; font-size: 12px; }
+    .num-btn { width: clamp(30px, 9vw, 36px); height: clamp(30px, 9vw, 36px); font-size: 18px; }
+    .num-display { font-size: clamp(22px, 7vw, 26px); }
+    .num-unit { margin-top: 2px; font-size: 12px; }
+    .record-btn { padding: 10px 0; margin: 2px 0 4px; border-radius: 14px; }
+    .record-btn-text { font-size: 16px; }
+    .timer-area { min-height: 48px; margin: 2px 0 4px; border-radius: 16px; }
+    .timer-number { font-size: clamp(32px, 9vw, 52px); }
+    .timer-hint { display: none; }
+    .timer-label { font-size: 13px; }
+    .bottom-actions { padding-top: 4px; }
+    .nav-btn { padding: 9px 0; font-size: 13px; }
+  }
+
+  /* ===== 设置页：手风琴 + 拖拽 ===== */
+  .add-btn {
+    background: #34C759; color: #fff; border: none;
+    border-radius: 20px; padding: 8px 20px; font-size: 15px;
+    font-weight: 600; cursor: pointer; transition: transform 0.15s;
+  }
+  .add-btn:active { transform: scale(0.92); }
+  .settings-list { display: flex; flex-direction: column; gap: 10px; }
+  /* 版本号（设置页底部，点击检查更新） */
+  .settings-version {
+    text-align: center; color: #c7c7cc; font-size: 12px;
+    padding: 28px 0 10px; cursor: pointer; user-select: none;
+    line-height: 1.6;
+  }
+  .settings-version:active { color: #86868b; }
+  /* 设置项卡片（开关行） */
+  .settings-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .option-row {
+    background: #ffffff; border: 1px solid #e5e5ea; border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  }
+  .option-info { flex: 1; min-width: 0; }
+  .option-title { font-size: 16px; font-weight: 600; color: #1d1d1f; display: flex; align-items: center; gap: 7px; }
+  .option-title i { color: #34C759; font-size: 17px; }
+  .option-sub { font-size: 12px; color: #86868b; margin-top: 3px; line-height: 1.5; }
+  /* iOS 风开关 */
+  .switch { position: relative; width: 50px; height: 30px; flex-shrink: 0; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+  .switch-slider {
+    position: absolute; inset: 0; background: #e5e5ea; border-radius: 30px;
+    transition: background 0.22s; pointer-events: none;
+  }
+  .switch-slider::before {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 26px; height: 26px; background: #fff; border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.22); transition: transform 0.22s cubic-bezier(0.3, 0.9, 0.4, 1.2);
+  }
+  .switch input:checked + .switch-slider { background: #34C759; }
+  .switch input:checked + .switch-slider::before { transform: translateX(20px); }
+
+  .part-section {
+    background: #ffffff; border-radius: 14px; overflow: hidden;
+    border: 1px solid #e5e5ea;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .part-swipe-wrap { position: relative; overflow: hidden; }
+  .part-swipe-delete {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 80px; background: #ff3b30; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+  .part-section-head {
+    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.3, 1);
+    background: #ffffff; position: relative; z-index: 1;
+    display: flex; align-items: center; padding: 14px 16px;
+    cursor: pointer; gap: 12px; user-select: none;
+    touch-action: pan-y; /* 纵向滚动交给浏览器，横向由 JS 接管 */
+    will-change: transform;
+  }
+  .part-section-head.swipe-open { transform: translate3d(-80px, 0, 0); }
+  .part-section-head.swipe-drag { transition: none; }
+  .part-section-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .part-section-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .part-section-name { font-size: 16px; font-weight: 600; color: #1d1d1f; }
+  .part-section-count { font-size: 12px; color: #86868b; }
+  .part-section-arrow { font-size: 14px; color: #34C759; transition: transform 0.2s; }
+  .part-section.expanded .part-section-arrow { transform: rotate(90deg); }
+  .part-section-body {
+    display: none; padding: 4px 12px 12px;
+    flex-direction: column; gap: 6px;
+  }
+  .part-section.expanded .part-section-body { display: flex; }
+
+  .action-row {
+    display: flex; align-items: center; gap: 10px;
+    background: #f5f5f7; border-radius: 10px; padding: 10px 12px;
+    border: 1px solid #e5e5ea;
+    transition: opacity 0.2s, border-color 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .action-row.dragging { opacity: 0.4; }
+  .action-row.drag-over-top { border-top: 2px solid #34C759; }
+  .action-row.drag-over-bottom { border-bottom: 2px solid #34C759; }
+
+  .drag-handle {
+    cursor: grab; color: #c7c7cc; font-size: 16px;
+    padding: 2px 4px; user-select: none;
+    display: flex; align-items: center; flex-shrink: 0;
+  }
+  .drag-handle:active { cursor: grabbing; color: #86868b; }
+  .part-drag-handle { cursor: grab; opacity: 0.4; transition: opacity 0.15s; }
+  .part-drag-handle:hover { opacity: 1; }
+  .part-section-head.dragging { opacity: 0.4; }
+  .part-section-head.part-drag-over { border-top: 3px solid #34C759; margin-top: -3px; }
+
+  .action-row-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .action-row-name {
+    font-size: 15px; font-weight: 500; color: #1d1d1f;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .action-row-detail { font-size: 12px; color: #86868b; }
+  .action-row-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .mini-btn {
+    background: transparent; border: none; font-size: 16px;
+    padding: 6px 8px; cursor: pointer; transition: transform 0.15s;
+  }
+  .mini-btn:active { transform: scale(0.85); }
+
+  .drag-hint {
+    font-size: 11px; color: #d1d1d6; text-align: center;
+    padding: 6px 0 2px;
+  }
+
+  /* ===== 历史页 ===== */
+  .clear-btn {
+    background: #fff0f0; color: #ff3b30; border: none;
+    border-radius: 16px; padding: 6px 16px; font-size: 13px;
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .clear-btn:active { transform: scale(0.92); }
+  .record-list { display: flex; flex-direction: column; gap: 14px; }
+  .record-card {
+    background: #ffffff; border-radius: 14px; padding: 16px 18px;
+    border: 1px solid #e5e5ea;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .record-date {
+    font-size: 16px; font-weight: 600; color: #34C759;
+    margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e5ea;
+  }
+  .record-part { font-size: 13px; color: #86868b; margin-bottom: 6px; }
+  .record-action { display: flex; justify-content: space-between; padding: 4px 0; gap: 8px; }
+  .record-action-name { font-size: 15px; color: #1d1d1f; font-weight: 500; }
+  .record-action-groups { font-size: 13px; color: #86868b; text-align: right; }
+  .record-action-detail {
+    display: inline-block; background: #f5f5f7; padding: 1px 8px;
+    border-radius: 4px; margin-left: 4px; color: #636366; font-size: 12px;
+  }
+  .record-total {
+    margin-top: 10px; padding-top: 8px; border-top: 1px solid #e5e5ea;
+    font-size: 13px; color: #aeaeb2; text-align: right;
+  }
+  .empty-wrap { text-align: center; color: #86868b; padding: 60px 0; display: flex; flex-direction: column; gap: 8px; }
+  .sub-tip { font-size: 14px; color: #d1d1d6; }
+
+  /* ===== 弹窗 ===== */
+  .modal-mask {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); display: flex;
+    align-items: center; justify-content: center; z-index: 200;
+    animation: fadeIn 0.2s;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-content {
+    background: #ffffff; border-radius: 20px; padding: 24px 20px;
+    width: 88%; max-height: 80%; overflow-y: auto;
+    animation: slideUp 0.25s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-title {
+    font-size: 20px; font-weight: 700; color: #1d1d1f;
+    display: block; margin-bottom: 20px; text-align: center;
+  }
+  .form-group { margin-bottom: 14px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-group.half { flex: 1; }
+
+  /* 每组重量次数配置 */
+  .sets-config-list { display: flex; flex-direction: column; gap: 8px; }
+  .set-config-row {
+    display: flex; align-items: center; gap: 8px;
+    background: #f5f5f7; border-radius: 10px; padding: 8px 10px;
+  }
+  .set-config-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #34C759; color: #fff; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .set-config-inputs { flex: 1; display: flex; gap: 8px; align-items: center; }
+  .set-config-inputs input {
+    flex: 1; width: 100%; padding: 6px 8px; border-radius: 6px;
+    background: #fff; border: 1px solid #e5e5ea; color: #1d1d1f;
+    font-size: 14px; text-align: center; outline: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .set-config-inputs input:focus { border-color: #34C759; }
+  .set-config-inputs label { font-size: 11px; color: #aeaeb2; min-width: 16px; }
+  .form-label { font-size: 13px; color: #86868b; display: block; margin-bottom: 4px; }
+  .form-input, .form-select {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    background: #f5f5f7; border: 1px solid #e5e5ea; color: #1d1d1f;
+    font-size: 16px; outline: none;
+  }
+  .form-input:focus, .form-select:focus { border-color: #34C759; }
+  .form-select option { background: #ffffff; color: #1d1d1f; }
+  .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .modal-btn {
+    flex: 1; padding: 12px 0; border-radius: 10px; border: none;
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.15s;
+  }
+  .modal-btn:active { transform: scale(0.95); }
+  .modal-cancel { background: #e5e5ea; color: #86868b; }
+  .modal-confirm { background: #34C759; color: #fff; }
+
+  /* ===== 全局 Toast ===== */
+  .toast {
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    background: rgba(29,29,31,0.95); color: #fff;
+    padding: 12px 24px; border-radius: 12px; font-size: 14px;
+    z-index: 300; animation: toastIn 0.25s ease-out;
+    border: 1px solid #d2d2d7;
+  }
+  @keyframes toastIn { from { transform: translateX(-50%) translateY(-10px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+
+  /* ===== 确认弹窗 ===== */
+  .confirm-content { text-align: center; }
+  .confirm-text { font-size: 16px; color: #3a3a3c; margin-bottom: 20px; line-height: 1.5; }
+
+  /* ===== 标签栏 ===== */
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #ffffff; border-top: 1px solid #e5e5ea;
+    display: flex; padding: 8px 0 max(24px, env(safe-area-inset-bottom, 0px)); z-index: 90;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 2px; cursor: pointer; padding: 6px 0;
+    background: none; border: none; color: #aeaeb2; transition: color 0.2s;
+  }
+  .tab-item.active { color: #34C759; }
+  .tab-icon { font-size: 22px; }
+  .tab-label { font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="screen" id="screen">
+
+    <!-- ============ 首页：部位选择 ============ -->
+    <div class="view active" id="view-home">
+      <div class="view-head">
+        <div class="container">
+          <div class="header">
+            <div class="title">今天练什么？</div>
+            <div class="header-actions">
+              <button class="icon-btn" id="fs-btn" onclick="toggleFullscreen()" title="全屏"><i data-ic="expand"></i></button>
+              <button class="icon-btn" onclick="showQRCode()"><i data-ic="qr"></i></button>
+              <button class="icon-btn" onclick="switchView('history')"><i data-ic="chart"></i></button>
+              <button class="icon-btn" onclick="switchView('settings')"><i data-ic="gear"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="container">
+          <div class="part-list" id="part-list"></div>
+
+          <div class="footer">
+            <button class="install-btn" id="install-btn" style="display:none" onclick="installApp()">
+              <i data-ic="plus"></i> 添加到主屏幕
+            </button>
+            <div class="offline-hint" id="offline-hint" style="display:none">
+              <div class="offline-hint-title" id="offline-hint-title">离线功能未启用</div>
+              <div class="offline-hint-body" id="offline-hint-body"></div>
+            </div>
+            <div class="footer-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 训练板块 ============ -->
+    <div class="view" id="view-training">
+
+      <!-- 训练启动页（选部位 / 继续进行中的训练） -->
+      <div class="training-hub" id="training-hub">
+        <div class="container">
+          <div class="header">
+            <div class="title">训练</div>
+          </div>
+          <div id="hub-ongoing"></div>
+          <div class="hub-list" id="hub-list"></div>
+          <div class="hub-empty" id="hub-empty" style="display:none">
+            还没有训练动作
+            <div class="hub-empty-sub">去「设置」页添加动作后开始训练</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 计时页（信息条 + 重量次数调节 + 计时 + 动作切换） -->
+      <div class="container training-container" id="training-session">
+        <div class="session-info">
+          <span class="si-part" id="tr-si-part">胸部</span>
+          <span class="si-name" id="tr-si-name">-</span>
+          <span class="si-group" id="tr-si-group">第 1 组 / 共 3 组</span>
+        </div>
+
+        <div class="adjust-area">
+          <div class="adjust-item">
+            <div class="adjust-label"><i data-ic="weight"></i> 重量</div>
+            <div class="number-control">
+              <button class="num-btn" onclick="adjustWeight(-2.5)">−</button>
+              <input class="num-input" id="tr-weight" type="number" inputmode="decimal" step="0.5" min="0" max="500" value="0" oninput="onWeightInput(this.value)" onchange="onWeightBlur()">
+              <button class="num-btn" onclick="adjustWeight(2.5)">+</button>
+            </div>
+            <div class="num-unit">kg</div>
+          </div>
+          <div class="adjust-item">
+            <div class="adjust-label"><i data-ic="hash"></i> 次数</div>
+            <div class="number-control">
+              <button class="num-btn" onclick="adjustReps(-1)">−</button>
+              <input class="num-input" id="tr-reps" type="number" inputmode="numeric" step="1" min="0" max="99" value="0" oninput="onRepsInput(this.value)" onchange="onRepsBlur()">
+              <button class="num-btn" onclick="adjustReps(1)">+</button>
+            </div>
+            <div class="num-unit">次</div>
+          </div>
+        </div>
+
+        <button class="record-btn" id="tr-record-btn" onclick="toggleTraining()">
+          <span class="record-btn-text" id="tr-record-btn-text"><i data-ic="play"></i> 开始计时</span>
+        </button>
+
+        <div class="timer-area" id="tr-timer" onclick="skipRest()">
+          <div class="timer-display"><span class="timer-number" id="tr-timer-num">00:00</span></div>
+          <div class="timer-status"><span class="timer-label" id="tr-timer-label">准备开始第一组</span></div>
+          <div class="timer-hint" id="tr-timer-hint" style="display:none">点击跳过休息</div>
+        </div>
+
+        <div class="bottom-actions">
+          <button class="nav-btn" id="tr-prev" onclick="prevAction()"><i data-ic="step-back"></i> 上个</button>
+          <button class="nav-btn next-btn" id="tr-next" onclick="nextAction()">下个 <i data-ic="step-forward"></i></button>
+          <button class="nav-btn end-btn" onclick="endTraining()"><i data-ic="flag"></i> 结束</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 设置页 ============ -->
+    <div class="view" id="view-settings">
+      <div class="view-head">
+        <div class="container">
+          <div class="header">
+            <div class="title"><i data-ic="gear"></i> 动作管理</div>
+            <button class="add-btn" onclick="openAddModal()"><i data-ic="plus"></i> 添加</button>
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="container">
+          <div class="settings-options">
+            <div class="option-row">
+              <div class="option-info">
+                <div class="option-title"><i data-ic="vibrate"></i> 震动提醒</div>
+                <div class="option-sub">准备倒计时最后 3 秒、休息结束时震动（iPhone 不支持网页震动）</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="vibration-toggle" onchange="setVibrationEnabled(this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-list" id="settings-list"></div>
+          <div class="empty-tip" id="settings-empty" style="display:none;color:#86868b;text-align:center;padding:40px 0">还没有动作，点击「+ 添加」创建</div>
+          <div class="settings-version" id="settings-version" onclick="checkUpdate()"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 历史记录 ============ -->
+    <div class="view" id="view-history">
+      <div class="view-head">
+        <div class="container">
+          <div class="header">
+            <div class="title"><i data-ic="calendar"></i> 训练日历</div>
+            <button class="clear-btn" id="clear-btn" onclick="clearAll()">清空</button>
+          </div>
+        </div>
+      </div>
+      <div class="view-body">
+        <div class="container">
+          <div class="calendar-wrap">
+            <div class="cal-nav">
+              <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+              <div class="cal-month-title" id="cal-month-title">-</div>
+              <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+            </div>
+            <div class="cal-weekdays">
+              <div class="cal-weekday">日</div>
+              <div class="cal-weekday">一</div>
+              <div class="cal-weekday">二</div>
+              <div class="cal-weekday">三</div>
+              <div class="cal-weekday">四</div>
+              <div class="cal-weekday">五</div>
+              <div class="cal-weekday">六</div>
+            </div>
+            <div class="cal-grid" id="cal-grid"></div>
+          </div>
+          <div id="day-detail-container"></div>
+          <div class="empty-wrap" id="history-empty" style="display:none">
+            <div>还没有训练记录</div>
+            <div class="sub-tip">去首页开始第一次训练吧</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 弹窗：二维码 ============ -->
+    <div class="modal-mask" id="modal-qr" style="display:none" onclick="document.getElementById('modal-qr').style.display='none'">
+      <div class="modal-content" style="text-align:center;padding:32px 24px" onclick="event.stopPropagation()">
+        <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:16px">扫码手机访问</div>
+        <div id="qr-container" style="display:inline-block;padding:16px;background:#fff;border-radius:16px;border:1px solid #e5e5ea"></div>
+        <div style="font-size:13px;color:#86868b;margin-top:12px">手机扫码 → 添加到主屏幕</div>
+      </div>
+    </div>
+
+    <!-- ============ 弹窗：动作编辑 ============ -->
+    <div class="modal-mask" id="modal-edit" style="display:none" onclick="closeEditModal(event)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="modal-title" id="edit-title">添加动作</span>
+        <div class="form-group">
+          <label class="form-label">动作名称</label>
+          <input class="form-input" id="edit-name" placeholder="如：杠铃卧推">
+        </div>
+        <div class="form-group">
+          <label class="form-label">训练部位</label>
+          <select class="form-select" id="edit-part"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label class="form-label">默认重量 (kg)</label>
+            <input class="form-input" id="edit-weight" type="number" step="0.5" min="0">
+          </div>
+          <div class="form-group half">
+            <label class="form-label">默认次数</label>
+            <input class="form-input" id="edit-reps" type="number" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">目标组数</label>
+          <input class="form-input" id="edit-sets" type="number" min="1" value="3" oninput="renderSetsConfig()">
+        </div>
+        <div class="form-group" id="sets-config-group">
+          <label class="form-label">每组重量次数配置</label>
+          <div class="sets-config-list" id="sets-config-list"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">开始倒计时 (秒，默认15秒，训练前的准备倒计时)</label>
+          <input class="form-input" id="edit-prepare" type="number" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">组间休息倒计时 (秒，如120=2分钟)</label>
+          <input class="form-input" id="edit-rest" type="number" min="1">
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-cancel" onclick="closeEditModal()">取消</button>
+          <button class="modal-btn modal-confirm" onclick="saveAction()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 弹窗：确认 ============ -->
+    <div class="modal-mask" id="modal-confirm" style="display:none">
+      <div class="modal-content confirm-content">
+        <div class="modal-title" id="confirm-title">确认</div>
+        <div class="confirm-text" id="confirm-text"></div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-cancel" onclick="confirmCancel()">取消</button>
+          <button class="modal-btn modal-confirm" onclick="confirmOk()">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 标签栏 ============ -->
+    <div class="tabbar">
+      <button class="tab-item active" data-view="home" onclick="switchView('home')">
+        <span class="tab-icon"><i data-ic="home"></i></span><span class="tab-label">首页</span>
+      </button>
+      <button class="tab-item" data-view="training" onclick="switchView('training')">
+        <span class="tab-icon"><i data-ic="dumbbell"></i></span><span class="tab-label">训练</span>
+      </button>
+      <button class="tab-item" data-view="history" onclick="switchView('history')">
+        <span class="tab-icon"><i data-ic="chart"></i></span><span class="tab-label">历史</span>
+      </button>
+      <button class="tab-item" data-view="settings" onclick="switchView('settings')">
+        <span class="tab-icon"><i data-ic="gear"></i></span><span class="tab-label">设置</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   内联 SVG 图标库（零外链，离线可用；随 font-size 缩放）
+   ============================================================ */
+const ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  'chevron-left': '<polyline points="15 18 9 12 15 6"/>',
+  'chevron-right': '<polyline points="9 18 15 12 9 6"/>',
+  play: '<polygon points="6 4 20 12 6 20" fill="currentColor" stroke="none"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
+  pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  hash: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  home: '<path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-9h6v9"/>',
+  chart: '<path d="M18 20v-9M12 20V5M6 20v-6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="8" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="18.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="18.5" r="1" fill="currentColor" stroke="none"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21v.01M17 18v3M21 17v.01M21 21v.01"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z"/><path d="M4 22v-7"/>',
+  'step-back': '<polygon points="18 19 9 12 18 5" fill="currentColor" stroke="none"/><path d="M6 5v14"/>',
+  'step-forward': '<polygon points="6 5 15 12 6 19" fill="currentColor" stroke="none"/><path d="M18 5v14"/>',
+  weight: '<circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.9 1.46L2.1 18.23A2 2 0 0 0 4 21h16a2 2 0 0 0 1.93-2.54L19.4 9.46A2 2 0 0 0 17.5 8Z"/>',
+  chest: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
+  back: '<path d="M5 3h14"/><path d="m18 13-6-6-6 6"/><path d="M12 7v14"/>',
+  legs: '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4M4 13h4"/>',
+  shoulder: '<path d="m3 19 5.5-9 3.5 5 2.5-3.5L21 19Z"/>',
+  arms: '<path d="m14.4 14.4-4.8-4.8"/><path d="M18.66 21.49a2 2 0 1 1-2.83-2.83l-1.77 1.77a2 2 0 1 1-2.83-2.83l6.37-6.36a2 2 0 1 1 2.82 2.82l1.77-1.76a2 2 0 1 1 2.83 2.83Z"/><path d="m21.5 21.5-1.4-1.4M3.9 3.9 2.5 2.5"/><path d="M6.4 12.77a2 2 0 1 1-2.83-2.83l1.77-1.77a2 2 0 1 1-2.83-2.83l2.83-2.83a2 2 0 1 1 2.83 2.83l1.77-1.77a2 2 0 1 1 2.82 2.83Z"/>',
+  core: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  box: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  grip: '<circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/>',
+  dumbbell: '<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1M3 3l1 1"/><path d="m18 22 4-4M2 6l4-4"/><path d="m3 10 7-7M14 21l7-7"/>',
+  expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  compress: '<path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>',
+  vibrate: '<path d="m2 8 2 2-2 2 2 2-2 2"/><path d="m22 8-2 2 2 2-2 2 2 2"/><rect x="8" y="5" width="8" height="14" rx="1.5"/>'
+};
+function icon(name) {
+  return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.box) + '</svg>';
+}
+// 替换静态 HTML 中的图标占位（<i data-ic="name">）
+document.querySelectorAll('i[data-ic]').forEach(el => {
+  el.outerHTML = icon(el.getAttribute('data-ic'));
+});
+
+/* ============================================================
+   部位定义（预定义，可扩展）
+   ============================================================ */
+const BODY_PARTS = [
+  { name: '胸部', icon: 'chest' },
+  { name: '背部', icon: 'back' },
+  { name: '腿部', icon: 'legs' },
+  { name: '肩部', icon: 'shoulder' },
+  { name: '手臂', icon: 'arms' },
+  { name: '核心', icon: 'core' },
+  { name: '未分类', icon: 'box' }
+];
+
+function getPartIcon(name) {
+  const p = BODY_PARTS.find(b => b.name === name);
+  return p ? p.icon : 'box';
+}
+
+/* 部位顺序持久化 */
+const PART_ORDER_KEY = 'part_order_v1';
+function getPartOrder() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PART_ORDER_KEY));
+    if (stored && Array.isArray(stored)) return stored;
+  } catch(e) {}
+  // 默认按 BODY_PARTS 顺序
+  return BODY_PARTS.map(p => p.name);
+}
+function savePartOrder(order) {
+  localStorage.setItem(PART_ORDER_KEY, JSON.stringify(order));
+}
+/* 获取按存储顺序排列的部位（含图标），未存储的追加到末尾 */
+function getOrderedParts() {
+  const order = getPartOrder();
+  const result = [];
+  const used = new Set();
+  order.forEach(name => {
+    const p = BODY_PARTS.find(b => b.name === name);
+    if (p) { result.push(p); used.add(name); }
+  });
+  BODY_PARTS.forEach(p => {
+    if (!used.has(p.name)) result.push(p);
+  });
+  return result;
+}
+
+/* ============================================================
+   应用版本
+   ⚠️ 每次部署前必须 +1（与 sw.js 顶部的 APP_VERSION 保持一致），
+   设置页底部展示该版本号，用于确认手机上是否已是最新版。
+   规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
+   ============================================================ */
+const APP_VERSION = '1.2.0';
+
+/* ============================================================
+   数据层
+   ============================================================ */
+const ACTIONS_KEY_V3 = 'training_actions_v3';
+const ACTIONS_KEY_V2 = 'training_actions_v2';
+const ACTIONS_KEY_V1 = 'training_actions_v1';
+const RECORDS_KEY = 'training_records_v1';
+const VIBRATION_KEY = 'gym_vibration_enabled'; // 震动开关（默认开）
+
+function getActions() {
+  try { return JSON.parse(localStorage.getItem(ACTIONS_KEY_V3)) || []; }
+  catch(e) { return []; }
+}
+function saveActions(actions) {
+  localStorage.setItem(ACTIONS_KEY_V3, JSON.stringify(actions));
+}
+function addAction(action) {
+  const actions = getActions();
+  action.id = Date.now().toString();
+  // 新动作放到该部位末尾
+  const samePart = actions.filter(a => a.bodyPart === action.bodyPart);
+  action.order = samePart.length;
+  actions.push(action);
+  saveActions(actions);
+}
+function updateAction(id, newData) {
+  const actions = getActions();
+  const idx = actions.findIndex(a => a.id === id);
+  if (idx === -1) return;
+  const oldPart = actions[idx].bodyPart;
+  // 如果改了部位，把 order 设到新部位末尾
+  if (newData.bodyPart && newData.bodyPart !== oldPart) {
+    const samePartCount = actions.filter(a => a.bodyPart === newData.bodyPart && a.id !== id).length;
+    newData.order = samePartCount;
+    actions[idx] = { ...actions[idx], ...newData };
+    // 重排旧部位剩余动作的 order，避免出现空隙
+    actions.filter(a => a.bodyPart === oldPart).forEach((a, i) => a.order = i);
+  } else {
+    actions[idx] = { ...actions[idx], ...newData };
+  }
+  saveActions(actions);
+}
+function deleteAction(id) {
+  const actions = getActions().filter(a => a.id !== id);
+  // 重排受影响部位的 order
+  const affectedParts = new Set();
+  actions.forEach(a => affectedParts.add(a.bodyPart));
+  affectedParts.forEach(part => {
+    const partActions = actions.filter(a => a.bodyPart === part);
+    partActions.forEach((a, i) => a.order = i);
+  });
+  saveActions(actions);
+}
+function getActionsByPart(part) {
+  return getActions()
+    .filter(a => a.bodyPart === part)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function getRecords() {
+  try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || []; }
+  catch(e) { return []; }
+}
+function saveRecord(record) {
+  const records = getRecords();
+  records.push({
+    id: Date.now().toString(),
+    date: new Date().toLocaleString('zh-CN'),
+    dateKey: formatDateKey(new Date()),
+    ...record
+  });
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
+function clearRecords() {
+  localStorage.setItem(RECORDS_KEY, '[]');
+}
+
+/* 健壮的记录日期解析：兼容 toLocaleString 各种格式 */
+function parseRecordDate(record) {
+  // 优先使用已存储的 dateKey
+  if (record.dateKey) return record.dateKey;
+  const raw = record.date || '';
+  // 尝试 Date 解析
+  const dt = new Date(raw);
+  if (!isNaN(dt.getTime())) {
+    return formatDateKey(dt);
+  }
+  // 手动解析 "2026/9/5" 或 "2026-9-5" 等
+  const match = raw.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (match) {
+    return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+  }
+  return null;
+}
+
+/* 扫描所有记录，返回已训练日期集合（YYYY-MM-DD） */
+function getTrainingDates() {
+  const records = getRecords();
+  const dates = new Set();
+  records.forEach(r => {
+    const key = parseRecordDate(r);
+    if (key) dates.add(key);
+  });
+  return dates;
+}
+
+function formatDateKey(d) {
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/* 聚合某日的训练记录，返回嵌套结构：部位 → 动作 → 每组顺序 */
+function getRecordsByDate(dateKey) {
+  const records = getRecords();
+  // 按部位分组，保持记录原始顺序
+  const partMap = {};
+  records.forEach(r => {
+    if (parseRecordDate(r) !== dateKey) return;
+    const part = r.bodyPart || '未分类';
+    if (!partMap[part]) partMap[part] = [];
+    // 把该次训练的所有动作按顺序加入
+    r.actions.forEach(a => {
+      partMap[part].push({
+        actionName: a.actionName,
+        groups: a.groups.map(g => ({ ...g }))
+      });
+    });
+  });
+  // 按 BODY_PARTS 顺序排列部位
+  const orderedParts = BODY_PARTS.filter(p => partMap[p.name]);
+  Object.keys(partMap).forEach(p => {
+    if (!orderedParts.find(op => op.name === p)) {
+      orderedParts.push({ name: p, icon: getPartIcon(p) });
+    }
+  });
+  return orderedParts.map(p => ({
+    name: p.name,
+    icon: p.icon,
+    actions: partMap[p.name]
+  }));
+}
+
+/* 统一迁移：v1/v2 -> v3，给每个部位内的动作分配 order */
+function assignOrders(actions) {
+  const partMap = {};
+  actions.forEach(a => {
+    if (!partMap[a.bodyPart]) partMap[a.bodyPart] = 0;
+    a.order = partMap[a.bodyPart]++;
+  });
+  return actions;
+}
+
+function migrateV3() {
+  const v3 = localStorage.getItem(ACTIONS_KEY_V3);
+  if (v3) return; // 已是最新版本
+
+  // 尝试从 v2 迁移
+  const v2 = localStorage.getItem(ACTIONS_KEY_V2);
+  if (v2) {
+    try {
+      const oldActions = JSON.parse(v2) || [];
+      saveActions(assignOrders(oldActions.map(a => ({ ...a, bodyPart: a.bodyPart || '未分类' }))));
+      return;
+    } catch(e) {}
+  }
+  // 尝试从 v1 迁移
+  const v1 = localStorage.getItem(ACTIONS_KEY_V1);
+  if (v1) {
+    try {
+      const oldActions = JSON.parse(v1) || [];
+      saveActions(assignOrders(oldActions.map(a => ({ ...a, bodyPart: a.bodyPart || '未分类' }))));
+      return;
+    } catch(e) {}
+  }
+  // 首次加载，写入默认动作（按部位分组，带 order）
+  saveActions(assignOrders([
+    // 胸部
+    { id: '1', name: '杠铃卧推', bodyPart: '胸部', defaultWeight: 40, defaultReps: 12, prepareSeconds: 15, restSeconds: 90, targetSets: 3 },
+    { id: '2', name: '上斜哑铃卧推', bodyPart: '胸部', defaultWeight: 20, defaultReps: 10, prepareSeconds: 15, restSeconds: 90, targetSets: 3 },
+    { id: '3', name: '哑铃飞鸟', bodyPart: '胸部', defaultWeight: 15, defaultReps: 12, prepareSeconds: 15, restSeconds: 75, targetSets: 3 },
+    // 背部
+    { id: '4', name: '引体向上', bodyPart: '背部', defaultWeight: 0, defaultReps: 8, prepareSeconds: 15, restSeconds: 120, targetSets: 3 },
+    { id: '5', name: '杠铃划船', bodyPart: '背部', defaultWeight: 50, defaultReps: 10, prepareSeconds: 15, restSeconds: 90, targetSets: 3 },
+    { id: '6', name: '高位下拉', bodyPart: '背部', defaultWeight: 45, defaultReps: 12, prepareSeconds: 15, restSeconds: 75, targetSets: 3 },
+    // 腿部
+    { id: '7', name: '杠铃深蹲', bodyPart: '腿部', defaultWeight: 60, defaultReps: 10, prepareSeconds: 15, restSeconds: 120, targetSets: 3 },
+    { id: '8', name: '硬拉', bodyPart: '腿部', defaultWeight: 80, defaultReps: 8, prepareSeconds: 15, restSeconds: 150, targetSets: 3 },
+    { id: '9', name: '腿举', bodyPart: '腿部', defaultWeight: 70, defaultReps: 12, prepareSeconds: 15, restSeconds: 90, targetSets: 3 },
+    // 肩部
+    { id: '10', name: '站姿推举', bodyPart: '肩部', defaultWeight: 30, defaultReps: 10, prepareSeconds: 15, restSeconds: 90, targetSets: 3 },
+    { id: '11', name: '哑铃侧平举', bodyPart: '肩部', defaultWeight: 8, defaultReps: 15, prepareSeconds: 15, restSeconds: 60, targetSets: 3 },
+    // 手臂
+    { id: '12', name: '杠铃弯举', bodyPart: '手臂', defaultWeight: 25, defaultReps: 12, prepareSeconds: 15, restSeconds: 60, targetSets: 3 },
+    { id: '13', name: '绳索三头下压', bodyPart: '手臂', defaultWeight: 30, defaultReps: 12, prepareSeconds: 15, restSeconds: 60, targetSets: 3 },
+    // 核心
+    { id: '14', name: '平板支撑', bodyPart: '核心', defaultWeight: 0, defaultReps: 60, prepareSeconds: 15, restSeconds: 45, targetSets: 3 },
+    { id: '15', name: '卷腹', bodyPart: '核心', defaultWeight: 0, defaultReps: 20, prepareSeconds: 15, restSeconds: 45, targetSets: 3 }
+  ]));
+}
+
+/* 补丁：为已有动作补上 prepareSeconds 字段（向后兼容） */
+function patchPrepareSeconds() {
+  const actions = getActions();
+  let changed = false;
+  actions.forEach(a => {
+    if (a.prepareSeconds === undefined) { a.prepareSeconds = 15; changed = true; }
+  });
+  if (changed) saveActions(actions);
+}
+
+/* 补丁：为已有动作补上 targetSets 字段（向后兼容） */
+function patchTargetSets() {
+  const actions = getActions();
+  let changed = false;
+  actions.forEach(a => {
+    if (a.targetSets === undefined) { a.targetSets = 3; changed = true; }
+    // 补丁：为已有动作初始化 setsConfig
+    if (!a.setsConfig || a.setsConfig.length === 0) {
+      a.setsConfig = [];
+      for (let i = 0; i < (a.targetSets ?? 3); i++) {
+        a.setsConfig.push({ weight: a.defaultWeight, reps: a.defaultReps });
+      }
+      changed = true;
+    }
+  });
+  if (changed) saveActions(actions);
+}
+
+/* ============================================================
+   全局 UI 工具
+   ============================================================ */
+function showToast(msg) {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.getElementById('screen').appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+/* ===== 二维码生成（自动替换为局域网IP；离线时降级为地址文本） ===== */
+function showQRCode() {
+  // localhost / 127.0.0.1 → 局域网 IP
+  let url = location.href;
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    url = url.replace(location.hostname, '192.168.1.10');
+  }
+  const container = document.getElementById('qr-container');
+  container.innerHTML = '';
+
+  // 离线或二维码服务不可用：显示地址文本，供手机手动输入
+  const showUrlFallback = () => {
+    container.innerHTML = '';
+    const box = document.createElement('div');
+    box.style.cssText = 'width:200px;padding:18px 14px;background:#f5f5f7;border-radius:12px;font-size:14px;color:#1d1d1f;word-break:break-all;text-align:center;font-weight:600';
+    box.textContent = url;
+    container.appendChild(box);
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:12px;color:#86868b;margin-top:8px;width:200px;text-align:center';
+    hint.textContent = '离线模式：请在手机浏览器输入此地址';
+    container.appendChild(hint);
+  };
+
+  if (!navigator.onLine) {
+    showUrlFallback();
+    document.getElementById('modal-qr').style.display = 'flex';
+    return;
+  }
+
+  const img = document.createElement('img');
+  img.width = 200; img.height = 200;
+  img.style.cssText = 'display:block;border-radius:8px';
+  img.alt = '二维码';
+  img.onerror = showUrlFallback;
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
+  container.appendChild(img);
+  // 显示链接文字方便手动输入
+  const linkDiv = document.createElement('div');
+  linkDiv.style.cssText = 'font-size:12px;color:#86868b;margin-top:8px;word-break:break-all;width:200px;text-align:center';
+  linkDiv.textContent = url;
+  container.appendChild(linkDiv);
+  document.getElementById('modal-qr').style.display = 'flex';
+}
+
+let confirmCallback = null;
+function showConfirm(title, text, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  document.getElementById('modal-confirm').style.display = 'flex';
+  confirmCallback = onOk;
+}
+function confirmOk() {
+  document.getElementById('modal-confirm').style.display = 'none';
+  if (confirmCallback) confirmCallback();
+  confirmCallback = null;
+}
+function confirmCancel() {
+  document.getElementById('modal-confirm').style.display = 'none';
+  confirmCallback = null;
+}
+
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  const tab = document.querySelector(`.tab-item[data-view="${name}"]`);
+  if (tab) tab.classList.add('active');
+  // 标签栏始终显示；训练板块按状态进入「启动页」或「计时页」
+  if (name === 'home') renderHome();
+  if (name === 'settings') renderSettings();
+  if (name === 'history') renderHistory();
+  if (name === 'training') {
+    if (training.active) showSession();
+    else showHub();
+  }
+  // 切页时把新页面的内部滚动体归位
+  const viewEl = document.getElementById('view-' + name);
+  const bodyEl = viewEl ? viewEl.querySelector('.view-body') : null;
+  if (bodyEl) bodyEl.scrollTop = 0;
+}
+
+function pulse(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.style.transition = 'transform 0.1s';
+  el.style.transform = 'scale(1.15)';
+  setTimeout(() => { el.style.transform = 'scale(1)'; }, 100);
+}
+
+/* ============================================================
+   首页：部位选择
+   ============================================================ */
+function renderHome() {
+  const actions = getActions();
+  const list = document.getElementById('part-list');
+  // 统计每个部位的动作
+  const partMap = {};
+  BODY_PARTS.forEach(p => partMap[p.name] = []);
+  actions.forEach(a => {
+    if (!partMap[a.bodyPart]) partMap[a.bodyPart] = [];
+    partMap[a.bodyPart].push(a);
+  });
+
+  // 过滤掉没有动作的部位，按持久化顺序排列
+  const availableParts = getOrderedParts().filter(p => partMap[p.name] && partMap[p.name].length > 0);
+
+  if (availableParts.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#86868b;padding:40px 0">还没有动作，去设置页添加吧</div>';
+    return;
+  }
+
+  list.innerHTML = availableParts.map(p => {
+    const partActions = partMap[p.name].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    return `
+      <div class="part-card" id="part-${p.name}">
+        <div class="part-head" onclick="togglePart('${p.name}')">
+          <div class="part-icon">${icon(p.icon)}</div>
+          <div class="part-info">
+            <div class="part-name">${p.name}训练</div>
+            <div class="part-count">${partActions.length} 个动作</div>
+          </div>
+          <div class="part-arrow">${icon('chevron-right')}</div>
+        </div>
+        <div class="part-actions">
+          ${partActions.map(a => `
+            <div class="part-action-item">
+              <span class="part-action-name">${a.name}</span>
+              <span class="part-action-defaults">${a.defaultWeight}kg×${a.defaultReps}次</span>
+            </div>
+          `).join('')}
+        </div>
+        <button class="part-start-btn" onclick="startPartTraining('${p.name}')">开始${p.name}训练 →</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function togglePart(name) {
+  const card = document.getElementById('part-' + name);
+  if (card) card.classList.toggle('expanded');
+}
+
+/* ============================================================
+   训练页状态
+   ============================================================ */
+const training = {
+  active: false,        // 是否有进行中的训练会话（控制训练板块进入 hub 还是 session）
+  actions: [],
+  actionIndex: 0,
+  currentAction: null,
+  bodyPart: '',
+  weight: 0,
+  reps: 0,
+  currentGroup: 1,
+  totalGroups: 1,
+  phase: 'idle',          // idle | preparing | training | resting
+  timerDisplay: '00:00',  // 主显示：开始倒计时/训练正计时/休息倒计时
+  timerLabel: '准备开始第一组',
+  trainingSeconds: 0,     // 训练正计时（秒）
+  restSeconds: 0,         // 剩余休息秒数
+  prepareSeconds: 0,      // 剩余开始倒计时秒数
+  restVibrationFired: false, // 休息30秒震动是否已触发
+  trainingLog: [],
+  activeInterval: null    // 单一定时器句柄（严格串行，任一时刻只有一个在跑）
+};
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function startPartTraining(part) {
+  const actions = getActionsByPart(part);
+  if (actions.length === 0) {
+    showToast('该部位还没有动作');
+    return;
+  }
+  training.actions = actions;
+  training.actionIndex = 0;
+  training.bodyPart = part;
+  training.trainingLog = [];
+  training.active = true;
+  loadAction(0);
+  switchView('training');
+}
+
+/* ===== 训练板块：启动页(hub) 与 计时页(session) 切换 ===== */
+function showHub() {
+  const view = document.getElementById('view-training');
+  view.classList.add('mode-hub');
+  view.classList.remove('mode-session');
+  renderTrainingHub();
+  const hub = document.getElementById('training-hub');
+  if (hub) hub.scrollTop = 0;
+}
+function showSession() {
+  const view = document.getElementById('view-training');
+  view.classList.add('mode-session');
+  view.classList.remove('mode-hub');
+  updateTrainingUI();
+}
+/* 启动页「继续训练」：回到计时页 */
+function resumeSession() { showSession(); }
+
+/* 启动页渲染：进行中卡片 + 部位开始列表 */
+function renderTrainingHub() {
+  const actions = getActions();
+  const partMap = {};
+  actions.forEach(a => {
+    if (!partMap[a.bodyPart]) partMap[a.bodyPart] = [];
+    partMap[a.bodyPart].push(a);
+  });
+  const ordered = getOrderedParts().filter(p => partMap[p.name] && partMap[p.name].length > 0);
+
+  const ongoingEl = document.getElementById('hub-ongoing');
+  const listEl = document.getElementById('hub-list');
+  const emptyEl = document.getElementById('hub-empty');
+
+  // 进行中的训练卡片
+  if (training.active && training.currentAction) {
+    const a = training.currentAction;
+    const statusMap = {
+      idle: '准备开始',
+      preparing: '准备倒计时中…',
+      training: '训练中 ' + formatTime(training.trainingSeconds),
+      resting: '休息中 ' + formatTime(training.restSeconds)
+    };
+    ongoingEl.innerHTML = `
+      <div class="ongoing-card">
+        <div class="ongoing-title">训练进行中</div>
+        <div class="ongoing-main">${training.bodyPart} · ${a.name}</div>
+        <div class="ongoing-status">第 ${training.currentGroup} 组 / 共 ${a.targetSets ?? 3} 组 · ${statusMap[training.phase] || ''}</div>
+        <div class="ongoing-actions">
+          <button class="ongoing-btn ongoing-resume" onclick="resumeSession()">继续训练</button>
+          <button class="ongoing-btn ongoing-end" onclick="endTraining()">结束</button>
+        </div>
+      </div>`;
+  } else {
+    ongoingEl.innerHTML = '';
+  }
+
+  if (ordered.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  listEl.innerHTML = ordered.map(p => `
+    <button class="hub-part" onclick="startPartTraining('${p.name}')">
+      <span class="part-section-icon">${icon(p.icon)}</span>
+      <span class="hub-part-info">
+        <span class="hub-part-name">${p.name}训练</span>
+        <span class="hub-part-count">${partMap[p.name].length} 个动作</span>
+      </span>
+      <span class="hub-part-go">开始</span>
+    </button>
+  `).join('');
+}
+
+/* 结束/放弃训练后重置会话，回到启动页 */
+function resetTrainingSession() {
+  clearTimers();
+  training.trainingLog = [];
+  training.currentGroup = 1;
+  training.totalGroups = 1;
+  training.active = false;
+  training.currentAction = null;
+  training.actions = [];
+  showHub();
+}
+
+function loadAction(index) {
+  const action = training.actions[index];
+  if (!action) return;
+  const existingLog = training.trainingLog.find(g => g.actionName === action.name);
+  const groupCount = existingLog ? existingLog.groups.length : 0;
+  clearTimers();
+  training.currentAction = action;
+  // 按组数使用 setsConfig 配置
+  const setIdx = groupCount; // 当前要做的组索引（0-based）
+  const sc = action.setsConfig && action.setsConfig[setIdx];
+  training.weight = sc ? sc.weight : action.defaultWeight;
+  training.reps = sc ? sc.reps : action.defaultReps;
+  training.currentGroup = groupCount + 1;
+  training.totalGroups = groupCount + 1;
+  training.phase = 'idle';
+  training.trainingSeconds = 0;
+  training.restSeconds = action.restSeconds;
+  training.prepareSeconds = action.prepareSeconds ?? 15;
+  training.restVibrationFired = false;
+  training.timerDisplay = '00:00';
+  training.timerLabel = groupCount > 0 ? `准备开始第 ${groupCount + 1} 组` : '准备开始第一组';
+  document.getElementById('tr-timer').classList.remove('warning');
+  updateTrainingUI();
+}
+
+function updateTrainingUI() {
+  const a = training.currentAction;
+  if (!a) return;
+  // 顶部信息条：部位 + 动作 + 组数
+  document.getElementById('tr-si-part').textContent = training.bodyPart;
+  document.getElementById('tr-si-name').textContent = a.name;
+  document.getElementById('tr-si-group').textContent = `第 ${training.currentGroup} 组 / 共 ${a.targetSets ?? 3} 组`;
+  // 仅在非聚焦状态下同步输入框值，避免覆盖用户正在输入的内容
+  const wInput = document.getElementById('tr-weight');
+  if (document.activeElement !== wInput) wInput.value = training.weight;
+  const rInput = document.getElementById('tr-reps');
+  if (document.activeElement !== rInput) rInput.value = training.reps;
+  document.getElementById('tr-timer-num').textContent = training.timerDisplay;
+  document.getElementById('tr-timer-label').textContent = training.timerLabel;
+
+  // 主按钮文案与状态
+  const btn = document.getElementById('tr-record-btn');
+  const btnText = document.getElementById('tr-record-btn-text');
+  const timerHint = document.getElementById('tr-timer-hint');
+  const timerEl = document.getElementById('tr-timer');
+
+  if (training.phase === 'idle') {
+    btnText.textContent = '开始计时';
+    btn.disabled = false;
+    timerHint.style.display = 'none';
+    timerEl.classList.remove('warning');
+  } else if (training.phase === 'preparing') {
+    btnText.textContent = '准备中...';
+    btn.disabled = true;
+    timerHint.style.display = 'block';
+    timerEl.classList.remove('warning');
+  } else if (training.phase === 'training') {
+    btnText.textContent = '结束本组，开始休息';
+    btn.disabled = false;
+    timerHint.style.display = 'none';
+    timerEl.classList.remove('warning');
+  } else if (training.phase === 'resting') {
+    btnText.textContent = '休息中...';
+    btn.disabled = true;
+    timerHint.style.display = 'block';
+  }
+
+  // 休息最后30秒警告样式
+  if (training.phase === 'resting' && training.restSeconds <= 30) {
+    timerEl.classList.add('warning');
+  } else {
+    timerEl.classList.remove('warning');
+  }
+
+  // 训练中锁定上下切换
+  const busy = training.phase !== 'idle';
+  document.getElementById('tr-prev').disabled = training.actionIndex === 0 || busy;
+  document.getElementById('tr-next').disabled = training.actionIndex === training.actions.length - 1 || busy;
+}
+
+/* ===== 手动输入处理（只更新状态，不触发重渲染） ===== */
+function onWeightInput(val) {
+  if (training.phase !== 'idle') return;
+  let w = parseFloat(val);
+  if (isNaN(w)) return; // 输入中允许临时空值/非法值，不立即写回
+  if (w < 0) w = 0;
+  if (w > 500) w = 500;
+  training.weight = Math.round(w * 10) / 10;
+}
+function onWeightBlur() {
+  // 失焦时规范化显示
+  const el = document.getElementById('tr-weight');
+  let w = parseFloat(el.value);
+  if (isNaN(w) || w < 0) w = 0;
+  if (w > 500) w = 500;
+  training.weight = Math.round(w * 10) / 10;
+  el.value = training.weight;
+}
+function onRepsInput(val) {
+  if (training.phase !== 'idle') return;
+  let r = parseInt(val);
+  if (isNaN(r)) return;
+  if (r < 0) r = 0;
+  if (r > 99) r = 99;
+  training.reps = r;
+}
+function onRepsBlur() {
+  const el = document.getElementById('tr-reps');
+  let r = parseInt(el.value);
+  if (isNaN(r) || r < 0) r = 0;
+  if (r > 99) r = 99;
+  training.reps = r;
+  el.value = r;
+}
+
+function adjustWeight(delta) {
+  if (training.phase !== 'idle') return;
+  let w = training.weight + delta;
+  if (w < 0) w = 0;
+  if (w > 500) w = 500;
+  training.weight = Math.round(w * 10) / 10;
+  document.getElementById('tr-weight').value = training.weight;
+  pulse('tr-weight');
+}
+
+function adjustReps(delta) {
+  if (training.phase !== 'idle') return;
+  let r = training.reps + delta;
+  if (r < 0) r = 0;
+  if (r > 99) r = 99;
+  training.reps = r;
+  document.getElementById('tr-reps').value = r;
+  pulse('tr-reps');
+}
+
+function recordGroup() {
+  const { currentAction, weight, reps, currentGroup, trainingLog, trainingSeconds } = training;
+  let existing = trainingLog.find(g => g.actionName === currentAction.name);
+  const groupData = { weight, reps, groupNum: currentGroup, duration: trainingSeconds };
+  if (existing) {
+    existing.groups.push(groupData);
+  } else {
+    trainingLog.push({
+      actionName: currentAction.name,
+      groups: [groupData]
+    });
+  }
+  training.currentGroup = currentGroup + 1;
+  training.totalGroups = currentGroup + 1;
+}
+
+/* ===== 状态机主按钮（严格串行：同一时刻只有一个计时器） ===== */
+function toggleTraining() {
+  if (training.phase === 'idle') {
+    // 点击1：开始开始倒计时，倒计时结束后自动进入训练正计时
+    startPrepareTimer();
+  } else if (training.phase === 'training') {
+    // 点击2：结束本组并记录，开始休息倒计时
+    recordGroup();
+    startRestTimer();
+  }
+  // preparing/resting 状态下按钮禁用，不响应
+}
+
+/* 启动开始倒计时（单一定时器） */
+function startPrepareTimer() {
+  clearActiveInterval();
+  // 加载下一组的 setsConfig 重量次数
+  const setIdx = training.currentGroup - 1; // 0-based
+  const sc = training.currentAction.setsConfig && training.currentAction.setsConfig[setIdx];
+  if (sc) {
+    training.weight = sc.weight;
+    training.reps = sc.reps;
+  }
+  const prepareTotal = training.currentAction.prepareSeconds ?? 15;
+  // 如果设置为0秒，直接跳过倒计时进入训练
+  if (prepareTotal <= 0) {
+    startTrainingTimer();
+    return;
+  }
+  training.phase = 'preparing';
+  training.prepareSeconds = prepareTotal;
+  training.timerDisplay = formatTime(prepareTotal);
+  training.timerLabel = `准备中... 第 ${training.currentGroup} 组即将开始`;
+  document.getElementById('tr-timer').classList.remove('warning');
+  updateTrainingUI();
+
+  training.activeInterval = setInterval(() => {
+    training.prepareSeconds -= 1;
+    // 最后3秒震动提醒
+    if (training.prepareSeconds <= 3 && training.prepareSeconds > 0) {
+      buzz(100);
+    }
+    if (training.prepareSeconds <= 0) {
+      // 倒计时结束：震动 + 自动进入训练正计时
+      clearActiveInterval();
+      triggerVibration();
+      startTrainingTimer();
+    } else {
+      training.timerDisplay = formatTime(training.prepareSeconds);
+      updateTrainingUI();
+    }
+  }, 1000);
+}
+
+/* 启动训练正计时（单一定时器） */
+function startTrainingTimer() {
+  clearActiveInterval();
+  training.phase = 'training';
+  training.trainingSeconds = 0;
+  training.timerDisplay = '00:00';
+  training.timerLabel = `第 ${training.currentGroup} 组训练中...`;
+  document.getElementById('tr-timer').classList.remove('warning');
+  updateTrainingUI();
+
+  training.activeInterval = setInterval(() => {
+    training.trainingSeconds += 1;
+    training.timerDisplay = formatTime(training.trainingSeconds);
+    updateTrainingUI();
+  }, 1000);
+}
+
+/* 启动休息倒计时（单一定时器，停止训练计时） */
+function startRestTimer() {
+  clearActiveInterval();
+  const restTotal = training.currentAction.restSeconds;
+  training.phase = 'resting';
+  training.restSeconds = restTotal;
+  training.restVibrationFired = false;
+  training.timerDisplay = formatTime(restTotal);
+  training.timerLabel = `休息中... 第 ${training.currentGroup} 组准备`;
+  updateTrainingUI();
+
+  training.activeInterval = setInterval(() => {
+    training.restSeconds -= 1;
+    // 剩余30秒触发震动（仅一次；短休息也能触发）
+    if (training.restSeconds <= 30 && !training.restVibrationFired) {
+      triggerVibration();
+      training.restVibrationFired = true;
+    }
+    if (training.restSeconds <= 0) {
+      // 休息结束：清除倒计时，自动进入下一组开始倒计时
+      clearActiveInterval();
+      const timerEl = document.getElementById('tr-timer');
+      timerEl.classList.add('rest-finished-pulse');
+      setTimeout(() => timerEl.classList.remove('rest-finished-pulse'), 600);
+      startPrepareTimer(); // 自动进入下一组开始倒计时 → 训练
+    } else {
+      training.timerDisplay = formatTime(training.restSeconds);
+      updateTrainingUI();
+    }
+  }, 1000);
+}
+
+/* 震动开关（默认开启；iOS Safari 不支持 Vibration API） */
+function isVibrationEnabled() {
+  return localStorage.getItem(VIBRATION_KEY) !== '0';
+}
+function setVibrationEnabled(on) {
+  localStorage.setItem(VIBRATION_KEY, on ? '1' : '0');
+  const t = document.getElementById('vibration-toggle');
+  if (t) t.checked = on;
+  // 开启时给一下确认震动，让用户立刻感知
+  if (on) buzz(120);
+}
+/* 统一震动入口：受开关控制，不支持时静默 */
+function buzz(pattern) {
+  if (isVibrationEnabled() && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch(e) {}
+  }
+}
+
+/* 震动反馈（Web Vibration API + 视觉降级，视觉抖动始终保留） */
+function triggerVibration() {
+  buzz([200, 100, 200]);
+  const timerEl = document.getElementById('tr-timer');
+  timerEl.classList.add('shake-alert');
+  setTimeout(() => timerEl.classList.remove('shake-alert'), 1500);
+}
+
+/* 跳过休息/跳过准备：按阶段正确流转 */
+function skipRest() {
+  if (training.phase === 'resting') {
+    // 跳过休息 → 进入下一组准备倒计时
+    const timerEl = document.getElementById('tr-timer');
+    timerEl.classList.add('rest-finished-pulse');
+    setTimeout(() => timerEl.classList.remove('rest-finished-pulse'), 600);
+    startPrepareTimer();
+  } else if (training.phase === 'preparing') {
+    // 跳过准备 → 直接进入训练
+    const timerEl = document.getElementById('tr-timer');
+    timerEl.classList.add('rest-finished-pulse');
+    setTimeout(() => timerEl.classList.remove('rest-finished-pulse'), 600);
+    startTrainingTimer();
+  }
+}
+
+function nextAction() {
+  if (training.phase !== 'idle') {
+    showToast('请先结束当前计时');
+    return;
+  }
+  clearTimers();
+  const next = training.actionIndex + 1;
+  if (next < training.actions.length) {
+    training.actionIndex = next;
+    loadAction(next);
+  }
+}
+function prevAction() {
+  if (training.phase !== 'idle') {
+    showToast('请先结束当前计时');
+    return;
+  }
+  clearTimers();
+  const prev = training.actionIndex - 1;
+  if (prev >= 0) {
+    training.actionIndex = prev;
+    loadAction(prev);
+  }
+}
+
+function endTraining() {
+  const log = training.trainingLog;
+  const existingGroups = log.reduce((sum, g) => sum + g.groups.length, 0);
+  // training 状态下会额外记录当前组
+  const willAddCurrent = training.phase === 'training';
+  // 没有任何有效记录：直接放弃会话，回到启动页
+  if (existingGroups === 0 && !willAddCurrent) {
+    resetTrainingSession();
+    return;
+  }
+  const totalGroups = existingGroups + (willAddCurrent ? 1 : 0);
+  showConfirm('结束训练', `${training.bodyPart}训练将保存 ${totalGroups} 组，确定吗？`, () => {
+    // 确认后才记录当前组，避免用户取消时误记录
+    if (willAddCurrent) {
+      recordGroup();
+    }
+    saveRecord({ bodyPart: training.bodyPart, actions: training.trainingLog });
+    resetTrainingSession();
+  });
+}
+
+/* 仅清除活动定时器（不改变 phase） */
+function clearActiveInterval() {
+  if (training.activeInterval) { clearInterval(training.activeInterval); training.activeInterval = null; }
+}
+
+/* 清除定时器并重置为 idle（loadAction/切换动作/结束训练时用） */
+function clearTimers() {
+  clearActiveInterval();
+  training.phase = 'idle';
+  document.getElementById('tr-timer').classList.remove('warning', 'shake-alert');
+}
+
+/* ============================================================
+   设置页：手风琴 + 拖拽排序
+   ============================================================ */
+let editingId = null;
+const expandedParts = new Set(['胸部']); // 默认展开胸部
+let draggedActionId = null;
+
+function togglePartSection(part) {
+  if (expandedParts.has(part)) expandedParts.delete(part);
+  else expandedParts.add(part);
+  renderSettings();
+}
+
+function renderSettings() {
+  const actions = getActions();
+  const list = document.getElementById('settings-list');
+  const empty = document.getElementById('settings-empty');
+  if (actions.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  // 按部位分组，组内按 order 排序
+  const partMap = {};
+  actions.forEach(a => {
+    if (!partMap[a.bodyPart]) partMap[a.bodyPart] = [];
+    partMap[a.bodyPart].push(a);
+  });
+  // 部位顺序按持久化顺序
+  const orderedParts = getOrderedParts().filter(p => partMap[p.name] && partMap[p.name].length > 0);
+
+  let html = '';
+  orderedParts.forEach((p, partIdx) => {
+    const partActions = partMap[p.name].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const isExpanded = expandedParts.has(p.name);
+    html += `
+      <div class="part-section ${isExpanded ? 'expanded' : ''}" data-part="${p.name}" data-part-idx="${partIdx}">
+        <div class="part-swipe-wrap">
+          <div class="part-swipe-delete" onclick="askDeletePart('${p.name}')">${icon('trash')}</div>
+          <div class="part-section-head" draggable="true" onclick="onPartHeadClick(this, '${p.name}')" ondragstart="onPartDragStart(event, '${p.name}')" ondragover="onPartDragOver(event, '${p.name}')" ondrop="onPartDrop(event, '${p.name}')" ondragend="onPartDragEnd(event)" ontouchstart="onPartSwipeStart(event, '${p.name}')" ontouchmove="onPartSwipeMove(event, '${p.name}')" ontouchend="onPartSwipeEnd(event, '${p.name}')" ontouchcancel="onPartSwipeEnd(event, '${p.name}')">
+            <div class="drag-handle part-drag-handle">${icon('grip')}</div>
+            <div class="part-section-icon">${icon(p.icon)}</div>
+            <div class="part-section-info">
+              <div class="part-section-name">${p.name}训练</div>
+              <div class="part-section-count">${partActions.length} 个动作</div>
+            </div>
+            <div class="part-section-arrow">${icon('chevron-right')}</div>
+          </div>
+        </div>
+        <div class="part-section-body">
+          ${partActions.map(a => `
+            <div class="action-row" draggable="true" data-action-id="${a.id}" data-part="${p.name}">
+              <div class="drag-handle">${icon('grip')}</div>
+              <div class="action-row-info">
+                <div class="action-row-name">${a.name}</div>
+                <div class="action-row-detail">${a.targetSets ?? 3}组 · ${(a.setsConfig || []).map((s, i) => `${s.weight}kg×${s.reps}`).join(' / ') || `${a.defaultWeight}kg × ${a.defaultReps}次`}</div>
+              </div>
+              <div class="action-row-actions" onclick="event.stopPropagation()">
+                <button class="mini-btn" onclick="openEditModal('${a.id}')">${icon('pen')}</button>
+                <button class="mini-btn" onclick="askDelete('${a.id}')">${icon('trash')}</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  });
+  list.innerHTML = html;
+  bindDragEvents();
+}
+
+/* ===== 部位拖拽排序 ===== */
+let draggedPartName = null;
+
+function onPartDragStart(e, partName) {
+  draggedPartName = partName;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', partName); } catch(e) {}
+}
+
+function onPartDragOver(e, partName) {
+  if (!draggedPartName || draggedPartName === partName) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const head = e.currentTarget;
+  head.classList.add('part-drag-over');
+}
+
+function onPartDrop(e, targetPartName) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedPartName || draggedPartName === targetPartName) return;
+  // 重新排列部位顺序
+  const order = getPartOrder();
+  const fromIdx = order.indexOf(draggedPartName);
+  const toIdx = order.indexOf(targetPartName);
+  if (fromIdx === -1 || toIdx === -1) return;
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, draggedPartName);
+  savePartOrder(order);
+  draggedPartName = null;
+  renderSettings();
+}
+
+function onPartDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.part-drag-over').forEach(el => el.classList.remove('part-drag-over'));
+  draggedPartName = null;
+}
+
+/* ===== 拖拽排序事件委托 ===== */
+function bindDragEvents() {
+  const rows = document.querySelectorAll('.action-row');
+  rows.forEach(row => {
+    row.addEventListener('dragstart', onDragStart);
+    row.addEventListener('dragover', onDragOver);
+    row.addEventListener('dragleave', onDragLeave);
+    row.addEventListener('drop', onDrop);
+    row.addEventListener('dragend', onDragEnd);
+  });
+}
+
+function onDragStart(e) {
+  draggedActionId = e.currentTarget.dataset.actionId;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  // Firefox 需要设置数据才能触发拖拽
+  try { e.dataTransfer.setData('text/plain', draggedActionId); } catch(e) {}
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if (row.dataset.actionId === draggedActionId) return;
+  // 清掉其他指示
+  document.querySelectorAll('.action-row').forEach(r => {
+    if (r !== row) { r.classList.remove('drag-over-top'); r.classList.remove('drag-over-bottom'); }
+  });
+  // 根据鼠标位置决定在上半还是下半
+  const rect = row.getBoundingClientRect();
+  const isAbove = (e.clientY - rect.top) < rect.height / 2;
+  row.classList.toggle('drag-over-top', isAbove);
+  row.classList.toggle('drag-over-bottom', !isAbove);
+}
+
+function onDragLeave(e) {
+  const row = e.currentTarget;
+  row.classList.remove('drag-over-top');
+  row.classList.remove('drag-over-bottom');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const targetRow = e.currentTarget;
+  const targetId = targetRow.dataset.actionId;
+  if (targetId === draggedActionId) return;
+
+  const isAbove = targetRow.classList.contains('drag-over-top');
+  if (!isAbove) {
+    // 插到目标行后面
+    const nextSibling = targetRow.nextElementSibling;
+    const draggedRow = document.querySelector('.action-row.dragging');
+    if (nextSibling) targetRow.parentElement.insertBefore(draggedRow, nextSibling);
+    else targetRow.parentElement.appendChild(draggedRow);
+  } else {
+    const draggedRow = document.querySelector('.action-row.dragging');
+    targetRow.parentElement.insertBefore(draggedRow, targetRow);
+  }
+  targetRow.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.action-row').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
+  // 关键：读取 DOM 新顺序，写回 order 并持久化
+  persistOrderFromDOM();
+  draggedActionId = null;
+}
+
+function persistOrderFromDOM() {
+  const actions = getActions();
+  // 遍历所有部位 section，按 DOM 顺序收集 action id
+  const newOrderIds = {};
+  document.querySelectorAll('.part-section').forEach(section => {
+    const part = section.dataset.part;
+    const ids = Array.from(section.querySelectorAll('.action-row')).map(r => r.dataset.actionId);
+    newOrderIds[part] = ids;
+  });
+  // 更新每个动作的 order
+  Object.keys(newOrderIds).forEach(part => {
+    newOrderIds[part].forEach((id, index) => {
+      const action = actions.find(a => a.id === id);
+      if (action) action.order = index;
+    });
+  });
+  saveActions(actions);
+  // 不重渲染，保持当前拖拽后的 DOM 顺序
+}
+
+function populatePartSelect(selected) {
+  const sel = document.getElementById('edit-part');
+  sel.innerHTML = BODY_PARTS.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+  if (selected) sel.value = selected;
+}
+
+/* 每组重量次数配置 */
+let setsConfigCache = []; // 临时存储编辑中的每组配置
+
+function renderSetsConfig() {
+  const count = Math.max(1, parseInt(document.getElementById('edit-sets').value) || 3);
+  const defaultWeight = parseFloat(document.getElementById('edit-weight').value) || 0;
+  const defaultReps = parseInt(document.getElementById('edit-reps').value) || 0;
+  // 调整 cache 长度，保留已有值，新增的用默认值填充
+  while (setsConfigCache.length < count) {
+    setsConfigCache.push({ weight: defaultWeight, reps: defaultReps });
+  }
+  if (setsConfigCache.length > count) {
+    setsConfigCache = setsConfigCache.slice(0, count);
+  }
+  const list = document.getElementById('sets-config-list');
+  list.innerHTML = setsConfigCache.map((s, i) => `
+    <div class="set-config-row">
+      <div class="set-config-num">${i + 1}</div>
+      <div class="set-config-inputs">
+        <input type="number" step="0.5" min="0" value="${s.weight}" placeholder="重量" oninput="updateSetConfig(${i}, 'weight', this.value)">
+        <label>kg</label>
+        <input type="number" min="0" value="${s.reps}" placeholder="次数" oninput="updateSetConfig(${i}, 'reps', this.value)">
+        <label>次</label>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateSetConfig(index, field, value) {
+  if (!setsConfigCache[index]) setsConfigCache[index] = { weight: 0, reps: 0 };
+  setsConfigCache[index][field] = field === 'weight' ? parseFloat(value) || 0 : parseInt(value) || 0;
+}
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('edit-title').textContent = '添加动作';
+  document.getElementById('edit-name').value = '';
+  document.getElementById('edit-weight').value = '';
+  document.getElementById('edit-reps').value = '';
+  document.getElementById('edit-sets').value = '3';
+  document.getElementById('edit-prepare').value = '15';
+  document.getElementById('edit-rest').value = '';
+  setsConfigCache = [];
+  populatePartSelect('胸部');
+  renderSetsConfig();
+  document.getElementById('modal-edit').style.display = 'flex';
+}
+
+function openEditModal(id) {
+  const action = getActions().find(a => a.id === id);
+  if (!action) return;
+  editingId = id;
+  document.getElementById('edit-title').textContent = '编辑动作';
+  document.getElementById('edit-name').value = action.name;
+  document.getElementById('edit-weight').value = action.defaultWeight;
+  document.getElementById('edit-reps').value = action.defaultReps;
+  document.getElementById('edit-sets').value = action.targetSets ?? 3;
+  document.getElementById('edit-prepare').value = action.prepareSeconds ?? 15;
+  document.getElementById('edit-rest').value = action.restSeconds;
+  // 加载已有每组配置或用默认值初始化
+  const sets = action.targetSets ?? 3;
+  if (action.setsConfig && action.setsConfig.length > 0) {
+    setsConfigCache = action.setsConfig.slice(0, sets);
+    while (setsConfigCache.length < sets) {
+      setsConfigCache.push({ weight: action.defaultWeight, reps: action.defaultReps });
+    }
+  } else {
+    setsConfigCache = [];
+    for (let i = 0; i < sets; i++) {
+      setsConfigCache.push({ weight: action.defaultWeight, reps: action.defaultReps });
+    }
+  }
+  populatePartSelect(action.bodyPart);
+  renderSetsConfig();
+  document.getElementById('modal-edit').style.display = 'flex';
+}
+
+function closeEditModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modal-edit').style.display = 'none';
+}
+
+function saveAction() {
+  const name = document.getElementById('edit-name').value.trim();
+  const bodyPart = document.getElementById('edit-part').value;
+  const weight = parseFloat(document.getElementById('edit-weight').value);
+  const reps = parseInt(document.getElementById('edit-reps').value);
+  const sets = parseInt(document.getElementById('edit-sets').value);
+  const prepare = parseInt(document.getElementById('edit-prepare').value);
+  const rest = parseInt(document.getElementById('edit-rest').value);
+
+  if (!name) { showToast('请输入动作名称'); return; }
+  if (isNaN(weight) || weight < 0) { showToast('请输入有效重量'); return; }
+  if (isNaN(reps) || reps < 0) { showToast('请输入有效次数'); return; }
+  if (isNaN(sets) || sets < 1) { showToast('组数至少1组'); return; }
+  if (isNaN(prepare) || prepare < 0) { showToast('开始倒计时不小于0'); return; }
+  if (isNaN(rest) || rest < 1) { showToast('休息时间至少1秒'); return; }
+
+  const data = { name, bodyPart, defaultWeight: weight, defaultReps: reps, targetSets: sets, prepareSeconds: prepare, restSeconds: rest, setsConfig: setsConfigCache.map(s => ({ weight: s.weight, reps: s.reps })) };
+  if (editingId) {
+    updateAction(editingId, data);
+  } else {
+    addAction(data);
+  }
+  document.getElementById('modal-edit').style.display = 'none';
+  renderSettings();
+  renderHome();
+}
+
+function askDelete(id) {
+  showConfirm('确认删除', '确定要删除这个动作吗？', () => {
+    deleteAction(id);
+    renderSettings();
+    renderHome();
+  });
+}
+
+/* ===== 部位左滑删除（手势状态机） =====
+   关键点：
+   - 位移以「手势开始时的位置」为基准（base），展开态右滑也能跟手；
+   - 首次明显移动时锁定方向，纵向交给页面滚动，横向才接管；
+   - 松手按「速度（轻扫）+ 位置（过半）」对称吸附，左右手感一致；
+   - 横向滑动后抑制合成 click，避免误触展开/折叠。 */
+const SWIPE_ACTION_W = 80;          // 删除按钮宽度（与 CSS 一致）
+const SWIPE_LOCK_PX = 8;            // 方向判定阈值（越小越灵敏）
+const SWIPE_FLICK_V = 0.35;         // 轻扫速度阈值 px/ms
+let swipeGesture = null;
+
+function onPartSwipeStart(e, partName) {
+  const touch = e.touches[0];
+  const el = e.currentTarget;
+  const base = el.classList.contains('swipe-open') ? -SWIPE_ACTION_W : 0;
+  swipeGesture = {
+    el, partName,
+    startX: touch.clientX, startY: touch.clientY,
+    base, x: base,
+    axis: null,                       // null | 'x' | 'y'
+    samples: []                       // 最近移动采样 {x, t}，用于松手速度
+  };
+  el.classList.add('swipe-drag');
+  // 关闭其他已展开的行（带动画回收）
+  document.querySelectorAll('.part-section-head.swipe-open').forEach(other => {
+    if (other !== el) other.classList.remove('swipe-open');
+  });
+}
+
+function onPartSwipeMove(e, partName) {
+  const g = swipeGesture;
+  if (!g || g.el !== e.currentTarget) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - g.startX;
+  const dy = touch.clientY - g.startY;
+
+  // 首次移动：锁定方向
+  if (!g.axis) {
+    if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return;
+    g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+  }
+  if (g.axis === 'y') return; // 纵向：不拦截，页面正常滚动
+
+  e.preventDefault();
+  // 以 base 为基准跟手，钳制在 [-80, 0]
+  const x = Math.max(-SWIPE_ACTION_W, Math.min(0, g.base + dx));
+  g.x = x;
+  // 记录最近 80ms 移动采样，松手时算窗口平均速度（px/ms）
+  const now = Date.now();
+  g.samples.push({ x, t: now });
+  while (g.samples.length > 2 && now - g.samples[0].t > 80) g.samples.shift();
+  g.el.style.transform = `translate3d(${x}px, 0, 0)`;
+}
+
+function onPartSwipeEnd(e, partName) {
+  const g = swipeGesture;
+  if (!g || g.el !== e.currentTarget) return;
+  swipeGesture = null;
+  const el = g.el;
+  el.classList.remove('swipe-drag');
+  el.style.transform = '';
+
+  if (g.axis !== 'x') return; // 纵向滚动/轻点：保持原状
+
+  // 松手速度：最近窗口内的平均速度（短手势也能准确反映轻扫）
+  let vel = 0;
+  const s = g.samples;
+  if (s.length >= 2) {
+    const dt = s[s.length - 1].t - s[0].t;
+    if (dt > 0) vel = (s[s.length - 1].x - s[0].x) / dt;
+  }
+  // 对称吸附：快速轻扫按方向定，否则按是否过半
+  const shouldOpen = vel <= -SWIPE_FLICK_V
+    ? true
+    : vel >= SWIPE_FLICK_V
+      ? false
+      : g.x < -SWIPE_ACTION_W / 2;
+  el.classList.toggle('swipe-open', shouldOpen);
+
+  // 抑制滑动后合成的 click（超过 10px 的横向位移视为滑动而非点击）
+  if (Math.abs(g.x - g.base) > 10) el.dataset.swiped = '1';
+}
+
+/* 头部点击：滑动后的 click 吞掉；展开态轻点改为收回删除按钮 */
+function onPartHeadClick(el, partName) {
+  if (el.dataset.swiped === '1') { el.dataset.swiped = '0'; return; }
+  if (el.classList.contains('swipe-open')) { el.classList.remove('swipe-open'); return; }
+  togglePartSection(partName);
+}
+
+function askDeletePart(partName) {
+  const actions = getActions().filter(a => a.bodyPart === partName);
+  showConfirm('删除部位', `确定要删除「${partName}」及其 ${actions.length} 个动作吗？`, () => {
+    // 删除该部位所有动作
+    const remaining = getActions().filter(a => a.bodyPart !== partName);
+    saveActions(remaining);
+    // 从部位顺序中移除
+    const order = getPartOrder().filter(n => n !== partName);
+    savePartOrder(order);
+    // 折叠状态清理
+    expandedParts.delete(partName);
+    renderSettings();
+    renderHome();
+  });
+}
+
+/* ============================================================
+   历史记录页：月历看板 + 日期详情
+   ============================================================ */
+const calendarState = {
+  viewDate: new Date(),   // 当前查看的月份
+  selectedDate: null      // 点击选中的日期 key
+};
+
+function renderHistory() {
+  const records = getRecords();
+  const empty = document.getElementById('history-empty');
+  const clearBtn = document.getElementById('clear-btn');
+  const calWrap = document.querySelector('.calendar-wrap');
+  // 日历常驻显示，不再因无记录而隐藏
+  calWrap.style.display = 'block';
+  renderCalendar();
+  // 清空按钮在无记录时隐藏
+  clearBtn.style.display = records.length > 0 ? 'block' : 'none';
+  // 选中日期时显示详情，否则清空
+  if (calendarState.selectedDate) {
+    showDateDetail(calendarState.selectedDate, true);
+  } else {
+    document.getElementById('day-detail-container').innerHTML = '';
+  }
+  // 空状态提示仅在无记录且未选中日期时显示
+  empty.style.display = (records.length === 0 && !calendarState.selectedDate) ? 'flex' : 'none';
+}
+
+function renderCalendar() {
+  const year = calendarState.viewDate.getFullYear();
+  const month = calendarState.viewDate.getMonth();
+  document.getElementById('cal-month-title').textContent = `${year}年${month + 1}月`;
+
+  const trainingDates = getTrainingDates();
+  const todayKey = formatDateKey(new Date());
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startWeekday = firstDay.getDay(); // 0=周日
+  const totalDays = lastDay.getDate();
+
+  let html = '';
+  // 前置空白
+  for (let i = 0; i < startWeekday; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
+  // 日期格
+  for (let d = 1; d <= totalDays; d++) {
+    const dateObj = new Date(year, month, d);
+    const dateKey = formatDateKey(dateObj);
+    const isToday = dateKey === todayKey;
+    const hasTraining = trainingDates.has(dateKey);
+    const isSelected = dateKey === calendarState.selectedDate;
+    const classes = [
+      'cal-day',
+      isToday ? 'today' : '',
+      hasTraining ? 'has-training' : '',
+      isSelected ? 'selected' : ''
+    ].filter(Boolean).join(' ');
+    html += `
+      <div class="${classes}" onclick="showDateDetail('${dateKey}')">
+        ${d}
+        ${hasTraining ? '<span class="cal-day-dot"></span>' : ''}
+      </div>
+    `;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function changeMonth(delta) {
+  calendarState.viewDate.setMonth(calendarState.viewDate.getMonth() + delta);
+  renderCalendar();
+}
+
+function showDateDetail(dateKey, silent) {
+  // 切换选中状态：再次点击同日期则收起
+  if (calendarState.selectedDate === dateKey && !silent) {
+    calendarState.selectedDate = null;
+    document.getElementById('day-detail-container').innerHTML = '';
+    renderCalendar();
+    return;
+  }
+  calendarState.selectedDate = dateKey;
+  renderCalendar();
+
+  const parts = getRecordsByDate(dateKey);
+  const container = document.getElementById('day-detail-container');
+  if (parts.length === 0) {
+    container.innerHTML = `<div class="day-detail"><div class="detail-empty">${dateKey} 无训练记录</div></div>`;
+    return;
+  }
+  // 计算统计
+  const totalGroups = parts.reduce((sum, p) =>
+    sum + p.actions.reduce((s, a) => s + a.groups.length, 0), 0);
+
+  container.innerHTML = `
+    <div class="day-detail">
+      <div class="day-detail-header">
+        <div class="day-detail-title">${icon('calendar')} ${dateKey}</div>
+        <div class="day-detail-summary">${parts.length}个部位 · ${totalGroups}组</div>
+      </div>
+      ${parts.map(p => `
+        <div class="detail-part">
+          <div class="detail-part-head">${icon(p.icon)} ${p.name}训练</div>
+          ${p.actions.map(a => `
+            <div class="detail-action">
+              <div class="detail-action-name">
+                <span>${a.actionName}</span>
+                <span style="color:#aeaeb2;font-size:12px">${a.groups.length}组</span>
+              </div>
+              <div class="detail-sets">
+                ${a.groups.map((g, idx) => `
+                  <span class="detail-set">
+                    <span class="set-num">${idx + 1}</span> ${g.weight}kg×${g.reps}次${g.duration ? ' ·' + formatTime(g.duration) : ''}
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function clearAll() {
+  showConfirm('确认清空', '确定要删除所有训练记录吗？此操作不可恢复！', () => {
+    clearRecords();
+    calendarState.selectedDate = null;
+    renderHistory();
+  });
+}
+
+/* ============================================================
+   全屏切换（桌面 / 安卓 Chrome 支持；iOS Safari 不支持则隐藏按钮）
+   ============================================================ */
+function fsSupported() {
+  return !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+}
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function toggleFullscreen() {
+  try {
+    if (isFullscreen()) {
+      if (document.exitFullscreen) { document.exitFullscreen().catch(() => {}); }
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      const el = document.documentElement;
+      if (el.requestFullscreen) { el.requestFullscreen().catch(() => {}); }
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }
+  } catch (e) { /* 不支持时忽略 */ }
+}
+function updateFullscreenIcon() {
+  const btn = document.getElementById('fs-btn');
+  if (btn) btn.innerHTML = icon(isFullscreen() ? 'compress' : 'expand');
+}
+['fullscreenchange', 'webkitfullscreenchange'].forEach(ev =>
+  document.addEventListener(ev, updateFullscreenIcon));
+(function initFullscreenBtn() {
+  const btn = document.getElementById('fs-btn');
+  if (!btn) return;
+  if (fsSupported()) updateFullscreenIcon();
+  else btn.style.display = 'none';
+})();
+
+/* ============================================================
+   启动
+   ============================================================ */
+migrateV3();
+patchPrepareSeconds();
+patchTargetSets();
+renderHome();
+
+// 刷新时重置视口（解决缩放/旋转后的尺寸异常）
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    window.scrollTo(0, 0);
+    document.getElementById('screen').scrollTop = 0;
+  }
+});
+
+// 动态适配：屏幕旋转/resize 时重新计算
+window.addEventListener('resize', () => {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+});
+document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+
+/* ===== PWA：安装到主屏幕 ===== */
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-btn').style.display = 'flex';
+});
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      deferredPrompt = null;
+      document.getElementById('install-btn').style.display = 'none';
+    });
+  } else {
+    // iOS 不支持 beforeinstallprompt，显示引导
+    const ua = navigator.userAgent;
+    const isiOS = /iphone|ipad|ipod/.test(ua.toLowerCase());
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    if (isiOS && !isStandalone) {
+      showConfirm('添加到主屏幕', '点击 Safari 底部的分享按钮，选择「添加到主屏幕」', () => {});
+    } else if (isStandalone) {
+      showToast('已在主屏幕模式');
+    } else {
+      showConfirm('添加到主屏幕', '在浏览器菜单中选择「添加到主屏幕」或「安装应用」', () => {});
+    }
+  }
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-btn').style.display = 'none';
+  deferredPrompt = null;
+});
+
+// iOS 不触发 beforeinstallprompt，手动显示按钮
+(function() {
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  const isMobile = /iphone|ipad|ipod|android|mobile/.test(navigator.userAgent.toLowerCase());
+  if (isMobile && !isStandalone) {
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (!deferredPrompt) {
+          document.getElementById('install-btn').style.display = 'flex';
+        }
+      }, 500);
+    });
+  }
+})();
+
+/* ===== 版本号展示 + 检查更新 =====
+   设置页底部显示当前版本；点击后整页刷新——
+   Service Worker 对页面导航是「在线取最新」策略，
+   所以在线刷新即可拿到最新部署的版本，版本号会随之变化。 */
+(function initVersion() {
+  const el = document.getElementById('settings-version');
+  if (el) el.innerHTML = 'Little GYM <b>v' + APP_VERSION + '</b><br>点击检查更新';
+  // 震动开关初始状态
+  const vt = document.getElementById('vibration-toggle');
+  if (vt) vt.checked = isVibrationEnabled();
+})();
+function checkUpdate() {
+  showToast('正在检查更新…');
+  setTimeout(() => location.reload(), 500);
+}
+
+/* ===== PWA：注册 Service Worker（离线缓存） =====
+   浏览器限制：Service Worker 只能在 HTTPS 或 localhost 下注册。
+   手机通过局域网 IP（http://192.168.x.x）访问时会被拒绝，
+   此时显示提示卡，告知需用 HTTPS 地址打开才能离线使用。 */
+function showOfflineHint(bodyHtml) {
+  const hint = document.getElementById('offline-hint');
+  const body = document.getElementById('offline-hint-body');
+  if (!hint || !body) return;
+  body.innerHTML = bodyHtml;
+  hint.style.display = 'block';
+}
+function setupServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    showOfflineHint('当前浏览器不支持离线缓存，请用最新版 Safari 或 Chrome 打开。');
+    return;
+  }
+  if (!window.isSecureContext) {
+    showOfflineHint(
+      '当前是局域网 HTTP 地址，浏览器禁止在此环境下离线缓存。<br>' +
+      '解决方法（任选其一）：<br>' +
+      '1）把本文件夹拖到 <code>app.netlify.com/drop</code>（免费，免登录），用得到的 HTTPS 链接在手机打开；<br>' +
+      '2）电脑运行 <code>cloudflared tunnel --url http://localhost:8000</code>，用输出的 HTTPS 链接在手机打开。<br>' +
+      '打开后再「添加到主屏幕」，即可完全离线使用。'
+    );
+    return;
+  }
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .catch(() => showOfflineHint('离线缓存注册失败，请刷新页面重试；若仍失败请用 HTTPS 地址访问。'));
+  });
+}
+setupServiceWorker();
+</script>
+
+</body>
+</html>
