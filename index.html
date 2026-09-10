@@ -213,11 +213,20 @@
   .detail-part { margin-bottom: 16px; }
   .detail-part:last-child { margin-bottom: 0; }
   .detail-part-head {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
     font-size: 14px; font-weight: 600; color: #1d1d1f;
     padding-bottom: 6px; border-bottom: 1px solid #e5e5ea;
     margin-bottom: 8px;
   }
+  .detail-del-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border: none; border-radius: 8px;
+    background: transparent; color: #ff3b30; cursor: pointer;
+    transition: background .15s;
+  }
+  .detail-del-btn:hover { background: rgba(255,59,48,0.1); }
+  .detail-del-btn:active { transform: scale(0.92); }
+  .detail-del-btn .ic { width: 18px; height: 18px; }
   .detail-action { margin-bottom: 10px; }
   .detail-action:last-child { margin-bottom: 0; }
   .detail-action-name {
@@ -1201,7 +1210,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 
 /* ============================================================
    数据层
@@ -1236,6 +1245,8 @@ function adjustRestTime(delta) {
   let r = training.restSeconds + delta;
   if (r < 1) r = 1;
   training.restSeconds = r;
+  // 同步更新休息总时长，使回填的 restDuration 反映调节后的值
+  training.restDurationTotal = Math.max(1, (training.restDurationTotal || 0) + delta);
   training.timerDisplay = formatTime(r);
   updateTrainingUI();
 }
@@ -1307,6 +1318,17 @@ function saveRecord(record) {
 function clearRecords() {
   localStorage.setItem(RECORDS_KEY, '[]');
 }
+/* 删除指定 id 的训练记录（单条部位训练） */
+function deleteRecord(id) {
+  const records = getRecords().filter(r => r.id !== id);
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
+/* 批量删除指定 id 列表的记录 */
+function deleteRecordsByIds(ids) {
+  const set = new Set(ids);
+  const records = getRecords().filter(r => !set.has(r.id));
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
 
 /* 健壮的记录日期解析：兼容 toLocaleString 各种格式 */
 function parseRecordDate(record) {
@@ -1352,10 +1374,11 @@ function getRecordsByDate(dateKey) {
   records.forEach(r => {
     if (parseRecordDate(r) !== dateKey) return;
     const part = r.bodyPart || '未分类';
-    if (!partMap[part]) partMap[part] = [];
+    if (!partMap[part]) partMap[part] = { actions: [], recordIds: [] };
+    partMap[part].recordIds.push(r.id);
     // 把该次训练的所有动作按顺序加入
     r.actions.forEach(a => {
-      partMap[part].push({
+      partMap[part].actions.push({
         actionName: a.actionName,
         groups: a.groups.map(g => ({ ...g }))
       });
@@ -1371,7 +1394,8 @@ function getRecordsByDate(dateKey) {
   return orderedParts.map(p => ({
     name: p.name,
     icon: p.icon,
-    actions: partMap[p.name]
+    actions: partMap[p.name].actions,
+    recordIds: partMap[p.name].recordIds
   }));
 }
 
@@ -1643,6 +1667,7 @@ const training = {
   restSeconds: 0,         // 剩余休息秒数
   prepareSeconds: 0,      // 剩余开始倒计时秒数
   restVibrationFired: false, // 休息30秒震动是否已触发
+  restDurationTotal: 0,      // 本次休息的总时长（含调节），用于回填到上一组的 restDuration
   trainingLog: [],
   activeInterval: null    // 单一定时器句柄（严格串行，任一时刻只有一个在跑）
 };
@@ -1951,7 +1976,7 @@ function initPickers() {
 function recordGroup() {
   const { currentAction, weight, reps, currentGroup, trainingLog, trainingSeconds } = training;
   let existing = trainingLog.find(g => g.actionName === currentAction.name);
-  const groupData = { weight, reps, groupNum: currentGroup, duration: trainingSeconds };
+  const groupData = { weight, reps, groupNum: currentGroup, duration: trainingSeconds, restDuration: 0 };
   if (existing) {
     existing.groups.push(groupData);
   } else {
@@ -2044,6 +2069,7 @@ function startTrainingTimer() {
 function startRestTimer() {
   clearActiveInterval();
   const restTotal = training.currentAction.restSeconds;
+  training.restDurationTotal = restTotal; // 记录本组休息总时长（含后续调节）
   training.phase = 'resting';
   training.restSeconds = restTotal;
   training.restVibrationFired = false;
@@ -2059,7 +2085,8 @@ function startRestTimer() {
       training.restVibrationFired = true;
     }
     if (training.restSeconds <= 0) {
-      // 休息结束：清除倒计时，自动进入下一组开始倒计时
+      // 休息结束：回填上一组的休息时长 = 休息倒计时 + 准备倒计时（若开启）
+      attachRestDurationToLastGroup();
       clearActiveInterval();
       const timerEl = document.getElementById('tr-timer');
       timerEl.classList.add('rest-finished-pulse');
@@ -2070,6 +2097,17 @@ function startRestTimer() {
       updateTrainingUI();
     }
   }, 1000);
+}
+
+/* 把本次休息时长（休息倒计时 + 准备倒计时若开启）回填到刚完成的那一组 */
+function attachRestDurationToLastGroup() {
+  const log = training.trainingLog;
+  if (!log || log.length === 0) return;
+  const lastAction = log[log.length - 1];
+  if (!lastAction.groups || lastAction.groups.length === 0) return;
+  const lastGroup = lastAction.groups[lastAction.groups.length - 1];
+  const prepareSec = isPrepareEnabled() ? getPrepareSeconds() : 0;
+  lastGroup.restDuration = (training.restDurationTotal || 0) + prepareSec;
 }
 
 /* 震动开关（默认开启；iOS Safari 不支持 Vibration API） */
@@ -2133,7 +2171,9 @@ function triggerVibration() {
 /* 跳过休息/跳过准备：按阶段正确流转 */
 function skipRest() {
   if (training.phase === 'resting') {
-    // 跳过休息 → 进入下一组准备倒计时
+    // 跳过休息 → 回填上一组休息时长（按已设定的休息总时长计），再进入下一组准备倒计时
+    clearActiveInterval();
+    attachRestDurationToLastGroup();
     const timerEl = document.getElementById('tr-timer');
     timerEl.classList.add('rest-finished-pulse');
     setTimeout(() => timerEl.classList.remove('rest-finished-pulse'), 600);
@@ -2840,7 +2880,12 @@ function showDateDetail(dateKey, silent) {
       </div>
       ${parts.map(p => `
         <div class="detail-part">
-          <div class="detail-part-head">${icon(p.icon)} ${p.name}训练</div>
+          <div class="detail-part-head">
+            <span>${icon(p.icon)} ${p.name}训练</span>
+            <button class="detail-del-btn" onclick="deletePartRecords('${dateKey}', '${p.recordIds.join(',')}')" title="删除该部位训练记录">
+              ${icon('trash')}
+            </button>
+          </div>
           ${p.actions.map(a => `
             <div class="detail-action">
               <div class="detail-action-name">
@@ -2850,7 +2895,7 @@ function showDateDetail(dateKey, silent) {
               <div class="detail-sets">
                 ${a.groups.map((g, idx) => `
                   <span class="detail-set">
-                    <span class="set-num">${idx + 1}</span> ${g.weight}kg×${g.reps}次${g.duration ? ' ·' + formatTime(g.duration) : ''}
+                    <span class="set-num">${idx + 1}</span> ${g.weight}kg×${g.reps}次${g.duration ? ' ·' + formatTime(g.duration) : ''}${g.restDuration ? ' ·休' + formatTime(g.restDuration) : ''}
                   </span>
                 `).join('')}
               </div>
@@ -2867,6 +2912,22 @@ function clearAll() {
     clearRecords();
     calendarState.selectedDate = null;
     renderHistory();
+  });
+}
+
+/* 删除某日某部位的训练记录（可能含多条同部位记录） */
+function deletePartRecords(dateKey, idsStr) {
+  const ids = (idsStr || '').split(',').filter(Boolean);
+  if (ids.length === 0) return;
+  showConfirm('确认删除', `确定要删除 ${dateKey} 的该部位训练记录吗？此操作不可恢复！`, () => {
+    deleteRecordsByIds(ids);
+    // 删除后若该日已无记录，收起详情
+    const remaining = getRecordsByDate(dateKey);
+    if (remaining.length === 0) {
+      calendarState.selectedDate = null;
+    }
+    renderHistory();
+    showToast('已删除');
   });
 }
 
