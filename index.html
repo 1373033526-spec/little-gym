@@ -320,15 +320,37 @@
   .training-hub .container { padding-bottom: 12px; }
   /* 计时页：固定不滚动 */
   .training-container {
-    display: none;
+    display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
     padding-bottom: 0;
+    position: relative;
   }
-  #view-training.mode-hub .training-hub { display: block; }
-  #view-training.mode-session .training-container { display: flex; }
+  /* 训练页空状态 */
+  .session-empty {
+    position: absolute; inset: 0; z-index: 5;
+    background: #fff;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 24px;
+  }
+  .session-empty-icon {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, #34C759, #248a3d);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; margin-bottom: 20px;
+  }
+  .session-empty-icon .ic { width: 36px; height: 36px; }
+  .session-empty-title { font-size: 20px; font-weight: 700; color: #1d1d1f; margin-bottom: 8px; }
+  .session-empty-sub { font-size: 14px; color: #86868b; margin-bottom: 24px; }
+  .session-empty-btn {
+    padding: 12px 28px; border-radius: 14px; border: none;
+    background: linear-gradient(135deg, #34C759, #248a3d); color: #fff;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .session-empty-btn:active { transform: scale(0.96); }
 
   /* 启动页：进行中训练卡片 */
   .ongoing-card {
@@ -397,34 +419,31 @@
   .adjust-area { display: flex; justify-content: space-around; padding: 16px 0 12px; gap: 16px; flex-shrink: 0; }
   .adjust-item { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
   .adjust-label { font-size: 14px; color: #86868b; margin-bottom: 8px; }
-  .number-control { display: flex; align-items: center; justify-content: center; gap: clamp(6px, 2vw, 14px); max-width: 100%; }
-  .num-btn {
-    width: clamp(34px, 9.5vw, 44px); height: clamp(34px, 9.5vw, 44px); border-radius: 50%;
-    background: #f0f0f2; border: none; color: #1d1d1f;
-    font-size: 22px; font-weight: 300; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+  /* 左右滑动选择器 */
+  .slide-picker {
+    position: relative; width: 100%; height: clamp(52px, 15vw, 68px);
+    overflow: hidden; user-select: none; -webkit-user-select: none;
+    touch-action: none;
   }
-  .num-btn:active { background: #e5e5ea; transform: scale(0.9); }
-  .num-display {
-    font-size: clamp(26px, 8vw, 32px); font-weight: 700; color: #1d1d1f;
-    min-width: 56px; text-align: center;
+  .slide-track {
+    display: flex; align-items: center; height: 100%;
+    will-change: transform;
+  }
+  .slide-track.animating { transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.3, 1); }
+  .slide-num {
+    flex: 0 0 33.333%; text-align: center;
     font-variant-numeric: tabular-nums;
+    font-size: clamp(24px, 7.5vw, 32px); font-weight: 700; color: #1d1d1f;
+    transition: opacity 0.2s, font-size 0.2s;
   }
-  .num-input {
-    width: clamp(52px, 16vw, 80px); min-width: 0; text-align: center;
-    font-size: clamp(24px, 7vw, 30px); font-weight: 700; color: #1d1d1f;
-    background: #f5f5f7; border: 1px solid #e5e5ea;
-    border-radius: 10px; padding: 6px 4px;
-    font-variant-numeric: tabular-nums; outline: none;
-    transition: border-color 0.2s;
-    -moz-appearance: textfield;
+  .slide-num.slide-prev, .slide-num.slide-next { opacity: 0.3; font-size: clamp(18px, 5.5vw, 24px); font-weight: 500; }
+  .slide-num.slide-cur { opacity: 1; }
+  .slide-picker::before, .slide-picker::after {
+    /* 左右渐隐遮罩，强化预览感 */
+    content: ''; position: absolute; top: 0; bottom: 0; width: 24px; pointer-events: none; z-index: 1;
   }
-  .num-input:focus { border-color: #34C759; }
-  .num-input::-webkit-outer-spin-button,
-  .num-input::-webkit-inner-spin-button {
-    -webkit-appearance: none; margin: 0;
-  }
+  .slide-picker::before { left: 0; background: linear-gradient(90deg, #fff 10%, transparent); }
+  .slide-picker::after { right: 0; background: linear-gradient(270deg, #fff 10%, transparent); }
   .num-unit { font-size: 13px; color: #aeaeb2; margin-top: 4px; }
 
   .record-btn {
@@ -452,6 +471,20 @@
   .timer-status { margin-top: 4px; }
   .timer-label { font-size: clamp(14px, 2.6vh, 18px); color: #86868b; }
   .timer-hint { font-size: 12px; color: #d1d1d6; margin-top: 8px; }
+  /* 休息时长调节键 */
+  .rest-adjust {
+    display: flex; justify-content: center; gap: 16px;
+    margin: 2px 0 6px; flex-shrink: 0;
+  }
+  .rest-adj-btn {
+    display: inline-flex; align-items: baseline; gap: 2px;
+    padding: 8px 16px; border-radius: 20px; border: 1px solid #e5e5ea;
+    background: #fff; color: #1d1d1f; font-size: 18px; font-weight: 700;
+    cursor: pointer; transition: transform 0.12s, background 0.12s;
+  }
+  .rest-adj-btn span { font-size: 12px; font-weight: 500; color: #86868b; }
+  .rest-adj-btn.plus { color: #34C759; }
+  .rest-adj-btn:active { transform: scale(0.92); background: #f0f0f2; }
   .timer-sub {
     font-size: 13px; color: #86868b; margin-top: 6px;
     font-variant-numeric: tabular-nums;
@@ -559,6 +592,21 @@
   }
   .switch input:checked + .switch-slider { background: #34C759; }
   .switch input:checked + .switch-slider::before { transform: translateX(20px); }
+  /* 步进调节器 */
+  .step-control { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .step-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: none;
+    background: #f0f0f2; color: #1d1d1f; font-size: 20px; font-weight: 300;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .step-btn:active { transform: scale(0.9); background: #e5e5ea; }
+  .step-input {
+    width: 52px; text-align: center; font-size: 16px; font-weight: 700;
+    padding: 6px 0; border: 1px solid #e5e5ea; border-radius: 8px; background: #f5f5f7;
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .step-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .step-unit { font-size: 14px; color: #86868b; }
 
   .part-section {
     background: #ffffff; border-radius: 14px; overflow: hidden;
@@ -614,10 +662,13 @@
     cursor: grab; color: #c7c7cc; font-size: 16px;
     padding: 2px 4px; user-select: none;
     display: flex; align-items: center; flex-shrink: 0;
+    touch-action: none; /* 移动端拖拽把手接管手势 */
   }
   .drag-handle:active { cursor: grabbing; color: #86868b; }
   .part-drag-handle { cursor: grab; opacity: 0.4; transition: opacity 0.15s; }
   .part-drag-handle:hover { opacity: 1; }
+  .action-row.dragging { opacity: 0.5; z-index: 10; position: relative; }
+  .part-section.dragging { opacity: 0.6; z-index: 10; position: relative; }
   .part-section-head.dragging { opacity: 0.4; }
   .part-section-head.part-drag-over { border-top: 3px solid #34C759; margin-top: -3px; }
 
@@ -802,45 +853,41 @@
     <!-- ============ 训练板块 ============ -->
     <div class="view" id="view-training">
 
-      <!-- 训练启动页（选部位 / 继续进行中的训练） -->
-      <div class="training-hub" id="training-hub">
-        <div class="container">
-          <div class="header">
-            <div class="title">训练</div>
-          </div>
-          <div id="hub-ongoing"></div>
-          <div class="hub-list" id="hub-list"></div>
-          <div class="hub-empty" id="hub-empty" style="display:none">
-            还没有训练动作
-            <div class="hub-empty-sub">去「设置」页添加动作后开始训练</div>
-          </div>
-        </div>
-      </div>
-
       <!-- 计时页（信息条 + 重量次数调节 + 计时 + 动作切换） -->
       <div class="container training-container" id="training-session">
+        <!-- 无进行中训练时的空状态 -->
+        <div class="session-empty" id="session-empty" style="display:none">
+          <div class="session-empty-icon"><i data-ic="dumbbell"></i></div>
+          <div class="session-empty-title">快开始今天的训练吧！</div>
+          <div class="session-empty-sub">去首页选择一个部位开始计时</div>
+          <button class="session-empty-btn" onclick="switchView('home')">去首页</button>
+        </div>
+
         <div class="session-info">
           <span class="si-part" id="tr-si-part">胸部</span>
           <span class="si-name" id="tr-si-name">-</span>
-          <span class="si-group" id="tr-si-group">第 1 组 / 共 3 组</span>
         </div>
 
         <div class="adjust-area">
           <div class="adjust-item">
             <div class="adjust-label"><i data-ic="weight"></i> 重量</div>
-            <div class="number-control">
-              <button class="num-btn" onclick="adjustWeight(-2.5)">−</button>
-              <input class="num-input" id="tr-weight" type="number" inputmode="decimal" step="0.5" min="0" max="500" value="0" oninput="onWeightInput(this.value)" onchange="onWeightBlur()">
-              <button class="num-btn" onclick="adjustWeight(2.5)">+</button>
+            <div class="slide-picker" id="picker-weight" data-field="weight" data-step="2.5" data-min="0" data-max="500">
+              <div class="slide-track">
+                <span class="slide-num slide-prev"></span>
+                <span class="slide-num slide-cur"></span>
+                <span class="slide-num slide-next"></span>
+              </div>
             </div>
             <div class="num-unit">kg</div>
           </div>
           <div class="adjust-item">
             <div class="adjust-label"><i data-ic="hash"></i> 次数</div>
-            <div class="number-control">
-              <button class="num-btn" onclick="adjustReps(-1)">−</button>
-              <input class="num-input" id="tr-reps" type="number" inputmode="numeric" step="1" min="0" max="99" value="0" oninput="onRepsInput(this.value)" onchange="onRepsBlur()">
-              <button class="num-btn" onclick="adjustReps(1)">+</button>
+            <div class="slide-picker" id="picker-reps" data-field="reps" data-step="1" data-min="0" data-max="99">
+              <div class="slide-track">
+                <span class="slide-num slide-prev"></span>
+                <span class="slide-num slide-cur"></span>
+                <span class="slide-num slide-next"></span>
+              </div>
             </div>
             <div class="num-unit">次</div>
           </div>
@@ -854,6 +901,12 @@
           <div class="timer-display"><span class="timer-number" id="tr-timer-num">00:00</span></div>
           <div class="timer-status"><span class="timer-label" id="tr-timer-label">准备开始第一组</span></div>
           <div class="timer-hint" id="tr-timer-hint" style="display:none">点击跳过休息</div>
+        </div>
+
+        <!-- 休息时长调节（仅休息阶段显示） -->
+        <div class="rest-adjust" id="rest-adjust" style="display:none">
+          <button class="rest-adj-btn" onclick="adjustRestTime(-getRestStep())">−<span id="rest-step-label">15s</span></button>
+          <button class="rest-adj-btn plus" onclick="adjustRestTime(getRestStep())">+<span id="rest-step-label2">15s</span></button>
         </div>
 
         <div class="bottom-actions">
@@ -886,6 +939,40 @@
                 <input type="checkbox" id="vibration-toggle" onchange="setVibrationEnabled(this.checked)">
                 <span class="switch-slider"></span>
               </label>
+            </div>
+            <div class="option-row">
+              <div class="option-info">
+                <div class="option-title"><i data-ic="clock"></i> 准备倒计时</div>
+                <div class="option-sub">训练开始前的准备倒计时，关闭后点击开始直接计时</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="prepare-toggle" onchange="setPrepareEnabled(this.checked)">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="option-row" id="prepare-seconds-row">
+              <div class="option-info">
+                <div class="option-title">准备倒计时时长</div>
+                <div class="option-sub">每组训练开始前的准备秒数</div>
+              </div>
+              <div class="step-control">
+                <button class="step-btn" onclick="setPrepareSeconds(getPrepareSeconds()-5)">−</button>
+                <input type="number" id="prepare-seconds-input" class="step-input" min="1" max="300" value="15" onchange="setPrepareSeconds(this.value)">
+                <span class="step-unit">s</span>
+                <button class="step-btn" onclick="setPrepareSeconds(getPrepareSeconds()+5)">+</button>
+              </div>
+            </div>
+            <div class="option-row">
+              <div class="option-info">
+                <div class="option-title"><i data-ic="clock"></i> 休息调节步进</div>
+                <div class="option-sub">计时页休息时，每次 +/− 增减的秒数</div>
+              </div>
+              <div class="step-control">
+                <button class="step-btn" onclick="setRestStep(getRestStep()-5)">−</button>
+                <input type="number" id="rest-step-input" class="step-input" min="1" max="300" value="15" onchange="setRestStep(this.value)">
+                <span class="step-unit">s</span>
+                <button class="step-btn" onclick="setRestStep(getRestStep()+5)">+</button>
+              </div>
             </div>
           </div>
           <div class="settings-list" id="settings-list"></div>
@@ -1050,7 +1137,9 @@ const ICONS = {
   dumbbell: '<path d="m6.5 6.5 11 11"/><path d="m21 21-1-1M3 3l1 1"/><path d="m18 22 4-4M2 6l4-4"/><path d="m3 10 7-7M14 21l7-7"/>',
   expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
   compress: '<path d="M3 8h3a2 2 0 0 0 2-2V3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>',
-  vibrate: '<path d="m2 8 2 2-2 2 2 2-2 2"/><path d="m22 8-2 2 2 2-2 2 2 2"/><rect x="8" y="5" width="8" height="14" rx="1.5"/>'
+  vibrate: '<path d="m2 8 2 2-2 2 2 2-2 2"/><path d="m22 8-2 2 2 2-2 2 2 2"/><rect x="8" y="5" width="8" height="14" rx="1.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  dumbbell: '<path d="M6.5 6.5 17.5 17.5"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/><rect x="2.5" y="7.5" width="3" height="9" rx="1" transform="rotate(-45 4 12)"/><rect x="18.5" y="7.5" width="3" height="9" rx="1" transform="rotate(-45 20 12)"/>'
 };
 function icon(name) {
   return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.box) + '</svg>';
@@ -1112,7 +1201,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.7.1';
 
 /* ============================================================
    数据层
@@ -1122,6 +1211,34 @@ const ACTIONS_KEY_V2 = 'training_actions_v2';
 const ACTIONS_KEY_V1 = 'training_actions_v1';
 const RECORDS_KEY = 'training_records_v1';
 const VIBRATION_KEY = 'gym_vibration_enabled'; // 震动开关（默认开）
+const REST_STEP_KEY = 'gym_rest_step';          // 休息时长调节步进（秒，默认15）
+const PREPARE_ENABLED_KEY = 'gym_prepare_enabled'; // 准备倒计时开关（默认开）
+const PREPARE_SECONDS_KEY = 'gym_prepare_seconds'; // 准备倒计时秒数（默认15）
+
+function getRestStep() {
+  const v = parseInt(localStorage.getItem(REST_STEP_KEY), 10);
+  return (v && v > 0) ? v : 15;
+}
+function setRestStep(sec) {
+  sec = Math.max(1, Math.min(300, parseInt(sec, 10) || 15));
+  localStorage.setItem(REST_STEP_KEY, String(sec));
+  // 同步设置页输入框 + 计时页按钮标签
+  const si = document.getElementById('rest-step-input');
+  if (si) si.value = sec;
+  ['rest-step-label', 'rest-step-label2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = sec + 's';
+  });
+}
+/* 调节当前休息时长（仅 resting 阶段生效） */
+function adjustRestTime(delta) {
+  if (training.phase !== 'resting') return;
+  let r = training.restSeconds + delta;
+  if (r < 1) r = 1;
+  training.restSeconds = r;
+  training.timerDisplay = formatTime(r);
+  updateTrainingUI();
+}
 
 function getActions() {
   try { return JSON.parse(localStorage.getItem(ACTIONS_KEY_V3)) || []; }
@@ -1429,8 +1546,15 @@ function switchView(name) {
   if (name === 'settings') renderSettings();
   if (name === 'history') renderHistory();
   if (name === 'training') {
-    if (training.active) showSession();
-    else showHub();
+    // 训练页始终可进：无进行中训练时显示空状态提示
+    const empty = document.getElementById('session-empty');
+    const session = document.getElementById('training-session');
+    if (training.active) {
+      empty.style.display = 'none';
+      showSession();
+    } else {
+      empty.style.display = 'flex';
+    }
   }
   // 切页时把新页面的内部滚动体归位
   const viewEl = document.getElementById('view-' + name);
@@ -1540,84 +1664,18 @@ function startPartTraining(part) {
   training.bodyPart = part;
   training.trainingLog = [];
   training.active = true;
+  const empty = document.getElementById('session-empty');
+  if (empty) empty.style.display = 'none';
   loadAction(0);
   switchView('training');
 }
 
-/* ===== 训练板块：启动页(hub) 与 计时页(session) 切换 ===== */
-function showHub() {
-  const view = document.getElementById('view-training');
-  view.classList.add('mode-hub');
-  view.classList.remove('mode-session');
-  renderTrainingHub();
-  const hub = document.getElementById('training-hub');
-  if (hub) hub.scrollTop = 0;
-}
+/* ===== 计时页显示 ===== */
 function showSession() {
-  const view = document.getElementById('view-training');
-  view.classList.add('mode-session');
-  view.classList.remove('mode-hub');
   updateTrainingUI();
 }
-/* 启动页「继续训练」：回到计时页 */
-function resumeSession() { showSession(); }
 
-/* 启动页渲染：进行中卡片 + 部位开始列表 */
-function renderTrainingHub() {
-  const actions = getActions();
-  const partMap = {};
-  actions.forEach(a => {
-    if (!partMap[a.bodyPart]) partMap[a.bodyPart] = [];
-    partMap[a.bodyPart].push(a);
-  });
-  const ordered = getOrderedParts().filter(p => partMap[p.name] && partMap[p.name].length > 0);
-
-  const ongoingEl = document.getElementById('hub-ongoing');
-  const listEl = document.getElementById('hub-list');
-  const emptyEl = document.getElementById('hub-empty');
-
-  // 进行中的训练卡片
-  if (training.active && training.currentAction) {
-    const a = training.currentAction;
-    const statusMap = {
-      idle: '准备开始',
-      preparing: '准备倒计时中…',
-      training: '训练中 ' + formatTime(training.trainingSeconds),
-      resting: '休息中 ' + formatTime(training.restSeconds)
-    };
-    ongoingEl.innerHTML = `
-      <div class="ongoing-card">
-        <div class="ongoing-title">训练进行中</div>
-        <div class="ongoing-main">${training.bodyPart} · ${a.name}</div>
-        <div class="ongoing-status">第 ${training.currentGroup} 组 / 共 ${a.targetSets ?? 3} 组 · ${statusMap[training.phase] || ''}</div>
-        <div class="ongoing-actions">
-          <button class="ongoing-btn ongoing-resume" onclick="resumeSession()">继续训练</button>
-          <button class="ongoing-btn ongoing-end" onclick="endTraining()">结束</button>
-        </div>
-      </div>`;
-  } else {
-    ongoingEl.innerHTML = '';
-  }
-
-  if (ordered.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = 'block';
-    return;
-  }
-  emptyEl.style.display = 'none';
-  listEl.innerHTML = ordered.map(p => `
-    <button class="hub-part" onclick="startPartTraining('${p.name}')">
-      <span class="part-section-icon">${icon(p.icon)}</span>
-      <span class="hub-part-info">
-        <span class="hub-part-name">${p.name}训练</span>
-        <span class="hub-part-count">${partMap[p.name].length} 个动作</span>
-      </span>
-      <span class="hub-part-go">开始</span>
-    </button>
-  `).join('');
-}
-
-/* 结束/放弃训练后重置会话，回到启动页 */
+/* 结束/放弃训练后重置会话，回到首页选部位 */
 function resetTrainingSession() {
   clearTimers();
   training.trainingLog = [];
@@ -1626,7 +1684,7 @@ function resetTrainingSession() {
   training.active = false;
   training.currentAction = null;
   training.actions = [];
-  showHub();
+  switchView('home');
 }
 
 function loadAction(index) {
@@ -1657,15 +1715,12 @@ function loadAction(index) {
 function updateTrainingUI() {
   const a = training.currentAction;
   if (!a) return;
-  // 顶部信息条：部位 + 动作 + 组数
+  // 顶部信息条：部位 + 动作
   document.getElementById('tr-si-part').textContent = training.bodyPart;
   document.getElementById('tr-si-name').textContent = a.name;
-  document.getElementById('tr-si-group').textContent = `第 ${training.currentGroup} 组 / 共 ${a.targetSets ?? 3} 组`;
-  // 仅在非聚焦状态下同步输入框值，避免覆盖用户正在输入的内容
-  const wInput = document.getElementById('tr-weight');
-  if (document.activeElement !== wInput) wInput.value = training.weight;
-  const rInput = document.getElementById('tr-reps');
-  if (document.activeElement !== rInput) rInput.value = training.reps;
+  // 同步滑动选择器显示
+  updatePicker('weight');
+  updatePicker('reps');
   document.getElementById('tr-timer-num').textContent = training.timerDisplay;
   document.getElementById('tr-timer-label').textContent = training.timerLabel;
 
@@ -1696,6 +1751,10 @@ function updateTrainingUI() {
     timerHint.style.display = 'block';
   }
 
+  // 休息时长调节键：仅休息阶段显示
+  const restAdj = document.getElementById('rest-adjust');
+  if (restAdj) restAdj.style.display = training.phase === 'resting' ? 'flex' : 'none';
+
   // 休息最后30秒警告样式
   if (training.phase === 'resting' && training.restSeconds <= 30) {
     timerEl.classList.add('warning');
@@ -1703,65 +1762,190 @@ function updateTrainingUI() {
     timerEl.classList.remove('warning');
   }
 
-  // 训练中锁定上下切换
-  const busy = training.phase !== 'idle';
-  document.getElementById('tr-prev').disabled = training.actionIndex === 0 || busy;
-  document.getElementById('tr-next').disabled = training.actionIndex === training.actions.length - 1 || busy;
+  // 上下动作切换：计时中也允许（nextAction/prevAction 会先停掉当前计时），
+  // 仅在到达首尾动作时禁用对应按钮
+  document.getElementById('tr-prev').disabled = training.actionIndex === 0;
+  document.getElementById('tr-next').disabled = training.actionIndex === training.actions.length - 1;
 }
 
-/* ===== 手动输入处理（只更新状态，不触发重渲染） ===== */
-function onWeightInput(val) {
-  if (training.phase !== 'idle') return;
-  let w = parseFloat(val);
-  if (isNaN(w)) return; // 输入中允许临时空值/非法值，不立即写回
-  if (w < 0) w = 0;
-  if (w > 500) w = 500;
-  training.weight = Math.round(w * 10) / 10;
+/* ===== 左右滑动选择器（重量 / 次数） ===== */
+function pickerConfig(field) {
+  if (field === 'weight') return { step: 2.5, min: 0, max: 500, decimals: 1 };
+  return { step: 1, min: 0, max: 99, decimals: 0 };
 }
-function onWeightBlur() {
-  // 失焦时规范化显示
-  const el = document.getElementById('tr-weight');
-  let w = parseFloat(el.value);
-  if (isNaN(w) || w < 0) w = 0;
-  if (w > 500) w = 500;
-  training.weight = Math.round(w * 10) / 10;
-  el.value = training.weight;
+function formatPickerVal(field, v) {
+  const cfg = pickerConfig(field);
+  if (cfg.decimals > 0) {
+    v = Math.round(v * 10) / 10;
+    return Number.isInteger(v) ? v.toString() : v.toFixed(cfg.decimals);
+  }
+  return Math.round(v).toString();
 }
-function onRepsInput(val) {
-  if (training.phase !== 'idle') return;
-  let r = parseInt(val);
-  if (isNaN(r)) return;
-  if (r < 0) r = 0;
-  if (r > 99) r = 99;
-  training.reps = r;
+function updatePicker(field) {
+  const picker = document.getElementById('picker-' + field);
+  if (!picker) return;
+  const cfg = pickerConfig(field);
+  const cur = field === 'weight' ? training.weight : training.reps;
+  const prev = Math.max(cfg.min, +(cur - cfg.step).toFixed(cfg.decimals));
+  const next = Math.min(cfg.max, +(cur + cfg.step).toFixed(cfg.decimals));
+  const track = picker.querySelector('.slide-track');
+  track.querySelector('.slide-prev').textContent = formatPickerVal(field, prev);
+  track.querySelector('.slide-cur').textContent = formatPickerVal(field, cur);
+  track.querySelector('.slide-next').textContent = formatPickerVal(field, next);
+  // 到达边界时清空对应预览，避免显示错误值
+  if (cur <= cfg.min) track.querySelector('.slide-prev').textContent = '';
+  if (cur >= cfg.max) track.querySelector('.slide-next').textContent = '';
 }
-function onRepsBlur() {
-  const el = document.getElementById('tr-reps');
-  let r = parseInt(el.value);
-  if (isNaN(r) || r < 0) r = 0;
-  if (r > 99) r = 99;
-  training.reps = r;
-  el.value = r;
-}
-
 function adjustWeight(delta) {
-  if (training.phase !== 'idle') return;
   let w = training.weight + delta;
-  if (w < 0) w = 0;
-  if (w > 500) w = 500;
+  const cfg = pickerConfig('weight');
+  w = Math.max(cfg.min, Math.min(cfg.max, w));
   training.weight = Math.round(w * 10) / 10;
-  document.getElementById('tr-weight').value = training.weight;
-  pulse('tr-weight');
+  updatePicker('weight');
+}
+function adjustReps(delta) {
+  let r = training.reps + delta;
+  const cfg = pickerConfig('reps');
+  r = Math.max(cfg.min, Math.min(cfg.max, r));
+  training.reps = r;
+  updatePicker('reps');
 }
 
-function adjustReps(delta) {
-  if (training.phase !== 'idle') return;
-  let r = training.reps + delta;
-  if (r < 0) r = 0;
-  if (r > 99) r = 99;
-  training.reps = r;
-  document.getElementById('tr-reps').value = r;
-  pulse('tr-reps');
+/* 滑动手势：连续多步 + 惯性 + 橡皮筋 + 力度灵敏度（苹果生态流畅感） */
+function initPickers() {
+  document.querySelectorAll('.slide-picker').forEach(picker => {
+    const track = picker.querySelector('.slide-track');
+    const field = picker.dataset.field;
+    const cfg = pickerConfig(field);
+    const adjustFn = field === 'weight' ? adjustWeight : adjustReps;
+    const curVal = () => field === 'weight' ? training.weight : training.reps;
+
+    let pointerId = null;
+    let baseX = 0;        // 当前格的基准 X
+    let moved = false;    // 是否真正移动过（区分点击）
+    let inertiaTimer = null; // 惯性动画句柄（setTimeout）
+
+    // 速度采样：最近 120ms 内的位移样本
+    const samples = []; // {x, t}
+
+    const itemW = () => picker.clientWidth / 3;
+
+    // 统一橡皮筋：越界位移非线性压缩（iOS 风格 x = c*d/(d+c)）
+    const rubberBand = (offset, limit) => {
+      if (offset === 0) return 0;
+      const c = limit * 0.5;
+      return (c * offset) / (Math.abs(offset) + c) * Math.sign(offset);
+    };
+
+    const applyTransform = (px) => {
+      track.style.transform = `translate3d(${px}px, 0, 0)`;
+    };
+
+    const onDown = (e) => {
+      // 取消正在进行的惯性
+      if (inertiaTimer) { clearTimeout(inertiaTimer); inertiaTimer = null; }
+      pointerId = e.pointerId;
+      baseX = e.clientX;
+      moved = false;
+      samples.length = 0;
+      samples.push({ x: e.clientX, t: performance.now() });
+      track.classList.remove('animating');
+      try { picker.setPointerCapture && picker.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+
+    const onMove = (e) => {
+      if (e.pointerId !== pointerId) return;
+      const x = e.clientX;
+      const dx = x - baseX;
+      const iw = itemW();
+
+      // 记录样本（保留最近 120ms）
+      const now = performance.now();
+      samples.push({ x, t: now });
+      while (samples.length > 1 && now - samples[0].t > 120) samples.shift();
+      if (Math.abs(x - baseX) > 4) moved = true;
+
+      // 连续步进：每跨过一格变一步
+      let ddx = dx;
+      while (ddx <= -iw && curVal() < cfg.max) {
+        adjustFn(cfg.step);
+        baseX -= iw;
+        ddx += iw;
+      }
+      while (ddx >= iw && curVal() > cfg.min) {
+        adjustFn(-cfg.step);
+        baseX += iw;
+        ddx -= iw;
+      }
+
+      // 剩余偏移：到边界用橡皮筋
+      let offset = x - baseX;
+      const atMin = curVal() <= cfg.min;
+      const atMax = curVal() >= cfg.max;
+      if ((atMin && offset > 0) || (atMax && offset < 0)) {
+        offset = rubberBand(offset, iw * 1.2);
+      }
+      applyTransform(offset);
+    };
+
+    const onUp = (e) => {
+      if (e.pointerId !== pointerId) return;
+      pointerId = null;
+      try { picker.releasePointerCapture && picker.releasePointerCapture(e.pointerId); } catch (_) {}
+
+      const iw = itemW();
+      const offset = (samples.length ? samples[samples.length - 1].x : e.clientX) - baseX;
+      const cur = curVal();
+
+      // 松手补半步（超过半格）
+      if (offset < -iw * 0.5 && cur < cfg.max) adjustFn(cfg.step);
+      else if (offset > iw * 0.5 && cur > cfg.min) adjustFn(-cfg.step);
+
+      // 速度：最近窗口内「每 ms 跨过的格数」，dt 设下限避免同步事件导致速度爆炸
+      let stepsPerMs = 0;
+      if (samples.length >= 2) {
+        const first = samples[0], last = samples[samples.length - 1];
+        const dt = Math.max(16, last.t - first.t);
+        stepsPerMs = (last.x - first.x) / iw / dt; // 格/ms（负=左滑=增）
+      }
+      const speed = Math.abs(stepsPerMs);
+
+      track.classList.add('animating');
+      // 仅真正拖动且速度够快才触发惯性；纯点击/慢拖不触发
+      if (moved && speed > 0.04) {
+        // 力度越大滑得越远：额外步数 = 格速度 * 系数，上限保护
+        const extraSteps = Math.min(20, Math.round(speed * 60));
+        let steps = extraSteps;
+        const dir = stepsPerMs < 0 ? 1 : -1; // 左滑增
+        const stepInterval = 22; // ms/步，流畅连续
+        const doStep = () => {
+          if (steps <= 0) {
+            track.style.transform = 'translateX(0)';
+            updatePicker(field);
+            inertiaTimer = null;
+            setTimeout(() => track.classList.remove('animating'), 280);
+            return;
+          }
+          if (dir > 0 && curVal() < cfg.max) adjustFn(cfg.step);
+          else if (dir < 0 && curVal() > cfg.min) adjustFn(-cfg.step);
+          steps--;
+          inertiaTimer = setTimeout(doStep, stepInterval);
+        };
+        doStep();
+      } else {
+        track.style.transform = 'translateX(0)';
+        updatePicker(field);
+        setTimeout(() => track.classList.remove('animating'), 280);
+      }
+    };
+
+    picker.addEventListener('pointerdown', onDown);
+    picker.addEventListener('pointermove', onMove);
+    picker.addEventListener('pointerup', onUp);
+    picker.addEventListener('pointercancel', onUp);
+    // 阻止触摸滚动干扰横向滑动
+    picker.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  });
 }
 
 function recordGroup() {
@@ -1803,7 +1987,12 @@ function startPrepareTimer() {
     training.weight = sc.weight;
     training.reps = sc.reps;
   }
-  const prepareTotal = training.currentAction.prepareSeconds ?? 15;
+  // 全局准备倒计时开关：关闭则直接进入训练正计时
+  if (!isPrepareEnabled()) {
+    startTrainingTimer();
+    return;
+  }
+  const prepareTotal = getPrepareSeconds();
   // 如果设置为0秒，直接跳过倒计时进入训练
   if (prepareTotal <= 0) {
     startTrainingTimer();
@@ -1894,6 +2083,38 @@ function setVibrationEnabled(on) {
   // 开启时给一下确认震动，让用户立刻感知
   if (on) buzz(120);
 }
+
+/* 准备倒计时开关（默认开启） */
+function isPrepareEnabled() {
+  return localStorage.getItem(PREPARE_ENABLED_KEY) !== '0';
+}
+function setPrepareEnabled(on) {
+  localStorage.setItem(PREPARE_ENABLED_KEY, on ? '1' : '0');
+  const t = document.getElementById('prepare-toggle');
+  if (t) t.checked = on;
+  updatePrepareSecondsRow();
+}
+/* 准备倒计时秒数（默认15，范围1~300） */
+function getPrepareSeconds() {
+  const v = parseInt(localStorage.getItem(PREPARE_SECONDS_KEY), 10);
+  return (v && v > 0) ? v : 15;
+}
+function setPrepareSeconds(sec) {
+  sec = Math.max(1, Math.min(300, parseInt(sec, 10) || 15));
+  localStorage.setItem(PREPARE_SECONDS_KEY, String(sec));
+  const inp = document.getElementById('prepare-seconds-input');
+  if (inp) inp.value = sec;
+}
+/* 联动：开关关闭时禁用时间输入 */
+function updatePrepareSecondsRow() {
+  const row = document.getElementById('prepare-seconds-row');
+  const inp = document.getElementById('prepare-seconds-input');
+  if (!row) return;
+  const on = isPrepareEnabled();
+  row.style.opacity = on ? '1' : '0.45';
+  row.style.pointerEvents = on ? 'auto' : 'none';
+  if (inp) inp.disabled = !on;
+}
 /* 统一震动入口：受开关控制，不支持时静默 */
 function buzz(pattern) {
   if (isVibrationEnabled() && navigator.vibrate) {
@@ -1927,28 +2148,25 @@ function skipRest() {
 }
 
 function nextAction() {
-  if (training.phase !== 'idle') {
-    showToast('请先结束当前计时');
+  // 计时中也允许切换动作：先停止当前计时，再切到下一个
+  const next = training.actionIndex + 1;
+  if (next >= training.actions.length) {
+    showToast('已经是最后一个动作');
     return;
   }
   clearTimers();
-  const next = training.actionIndex + 1;
-  if (next < training.actions.length) {
-    training.actionIndex = next;
-    loadAction(next);
-  }
+  training.actionIndex = next;
+  loadAction(next);
 }
 function prevAction() {
-  if (training.phase !== 'idle') {
-    showToast('请先结束当前计时');
+  const prev = training.actionIndex - 1;
+  if (prev < 0) {
+    showToast('已经是第一个动作');
     return;
   }
   clearTimers();
-  const prev = training.actionIndex - 1;
-  if (prev >= 0) {
-    training.actionIndex = prev;
-    loadAction(prev);
-  }
+  training.actionIndex = prev;
+  loadAction(prev);
 }
 
 function endTraining() {
@@ -2106,6 +2324,108 @@ function bindDragEvents() {
     row.addEventListener('drop', onDrop);
     row.addEventListener('dragend', onDragEnd);
   });
+  // 移动端：拖拽把手触发 touch 排序（HTML5 draggable 在手机不生效）
+  document.querySelectorAll('.action-row .drag-handle').forEach(handle => {
+    handle.addEventListener('touchstart', onActionTouchStart, { passive: false });
+    handle.addEventListener('touchmove', onActionTouchMove, { passive: false });
+    handle.addEventListener('touchend', onActionTouchEnd, { passive: false });
+    handle.addEventListener('touchcancel', onActionTouchEnd, { passive: false });
+  });
+  // 部位头部拖拽把手：touch 排序
+  document.querySelectorAll('.part-drag-handle').forEach(handle => {
+    handle.addEventListener('touchstart', onPartTouchStart, { passive: false });
+    handle.addEventListener('touchmove', onPartTouchMove, { passive: false });
+    handle.addEventListener('touchend', onPartTouchEnd, { passive: false });
+    handle.addEventListener('touchcancel', onPartTouchEnd, { passive: false });
+  });
+}
+
+/* ===== 移动端：动作行 touch 排序 ===== */
+let actionTouch = null;
+function onActionTouchStart(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const row = e.currentTarget.closest('.action-row');
+  if (!row) return;
+  actionTouch = { row, startY: e.touches[0].clientY, moved: false };
+  row.classList.add('dragging');
+}
+function onActionTouchMove(e) {
+  if (!actionTouch) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const y = e.touches[0].clientY;
+  if (Math.abs(y - actionTouch.startY) > 6) actionTouch.moved = true;
+  actionTouch.row.style.transform = `translateY(${y - actionTouch.startY}px)`;
+  // 遍历同容器内的行（跳过被拖动行），用 getBoundingClientRect 匹配
+  // 非拖动行没有 transform，rect 即真实布局位置
+  const container = actionTouch.row.parentElement;
+  const rows = Array.from(container.children);
+  for (const row of rows) {
+    if (row === actionTouch.row) continue;
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom) {
+      const isAbove = y < rect.top + rect.height / 2;
+      if (isAbove) container.insertBefore(actionTouch.row, row);
+      else if (row.nextElementSibling) container.insertBefore(actionTouch.row, row.nextElementSibling);
+      else container.appendChild(actionTouch.row);
+      break;
+    }
+  }
+}
+function onActionTouchEnd(e) {
+  if (!actionTouch) return;
+  const row = actionTouch.row;
+  row.classList.remove('dragging');
+  row.style.transform = '';
+  if (actionTouch.moved) persistOrderFromDOM();
+  actionTouch = null;
+}
+
+/* ===== 移动端：部位 touch 排序 ===== */
+let partTouch = null;
+function onPartTouchStart(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const section = e.currentTarget.closest('.part-section');
+  if (!section) return;
+  partTouch = { section, partName: section.dataset.part, startY: e.touches[0].clientY, moved: false };
+  section.classList.add('dragging');
+}
+function onPartTouchMove(e) {
+  if (!partTouch) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const y = e.touches[0].clientY;
+  if (Math.abs(y - partTouch.startY) > 6) partTouch.moved = true;
+  partTouch.section.style.transform = `translateY(${y - partTouch.startY}px)`;
+  // 遍历部位（跳过被拖动的），非拖动部位无 transform，rect 即真实布局位置
+  const container = partTouch.section.parentElement;
+  const sections = Array.from(container.children);
+  for (const sec of sections) {
+    if (sec === partTouch.section) continue;
+    const rect = sec.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom) {
+      const isAbove = y < rect.top + rect.height / 2;
+      if (isAbove) container.insertBefore(partTouch.section, sec);
+      else if (sec.nextElementSibling) container.insertBefore(partTouch.section, sec.nextElementSibling);
+      else container.appendChild(partTouch.section);
+      break;
+    }
+  }
+}
+function onPartTouchEnd(e) {
+  if (!partTouch) return;
+  const section = partTouch.section;
+  section.classList.remove('dragging');
+  section.style.transform = '';
+  if (partTouch.moved) {
+    // 按 DOM 新顺序保存部位顺序
+    const order = Array.from(document.querySelectorAll('.part-section')).map(s => s.dataset.part);
+    savePartOrder(order);
+    renderSettings();
+  }
+  partTouch = null;
 }
 
 function onDragStart(e) {
@@ -2506,15 +2826,17 @@ function showDateDetail(dateKey, silent) {
     container.innerHTML = `<div class="day-detail"><div class="detail-empty">${dateKey} 无训练记录</div></div>`;
     return;
   }
-  // 计算统计
+  // 计算统计：组数 + 总训练时长（精确到分秒）
   const totalGroups = parts.reduce((sum, p) =>
     sum + p.actions.reduce((s, a) => s + a.groups.length, 0), 0);
+  const totalDuration = parts.reduce((sum, p) =>
+    sum + p.actions.reduce((s, a) => s + a.groups.reduce((gs, g) => gs + (g.duration || 0), 0), 0), 0);
 
   container.innerHTML = `
     <div class="day-detail">
       <div class="day-detail-header">
         <div class="day-detail-title">${icon('calendar')} ${dateKey}</div>
-        <div class="day-detail-summary">${parts.length}个部位 · ${totalGroups}组</div>
+        <div class="day-detail-summary">${parts.length}个部位 · ${totalGroups}组 · ${formatTime(totalDuration)}</div>
       </div>
       ${parts.map(p => `
         <div class="detail-part">
@@ -2665,6 +2987,22 @@ window.addEventListener('appinstalled', () => {
   // 震动开关初始状态
   const vt = document.getElementById('vibration-toggle');
   if (vt) vt.checked = isVibrationEnabled();
+  // 休息步进初始值
+  const step = getRestStep();
+  const si = document.getElementById('rest-step-input');
+  if (si) si.value = step;
+  ['rest-step-label', 'rest-step-label2'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.textContent = step + 's';
+  });
+  // 准备倒计时开关 + 时长初始值
+  const pt = document.getElementById('prepare-toggle');
+  if (pt) pt.checked = isPrepareEnabled();
+  const psi = document.getElementById('prepare-seconds-input');
+  if (psi) psi.value = getPrepareSeconds();
+  updatePrepareSecondsRow();
+  // 初始化重量/次数滑动选择器
+  initPickers();
 })();
 function checkUpdate() {
   showToast('正在检查更新…');

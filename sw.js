@@ -1,7 +1,7 @@
 /* Little GYM Service Worker — 离线优先（cache-first） */
 /* ⚠️ 每次部署前必须 +1，并与 index.html 里的 APP_VERSION 保持一致。
    版本号变化会触发 SW 更新并自动清掉旧版缓存。 */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.7.1';
 const CACHE = 'little-gym-v' + APP_VERSION;
 const ASSETS = ['./', './index.html', './manifest.json'];
 
