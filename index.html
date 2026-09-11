@@ -435,7 +435,7 @@
   .adjust-label svg, .adjust-label .ic { width: 18px; height: 18px; }
   /* 上下滑动选择器 */
   .slide-picker {
-    position: relative; flex: 1; min-width: 0; width: auto; height: clamp(72px, 20vw, 96px);
+    position: relative; flex: 1; min-width: 0; width: auto; height: clamp(104px, 30vw, 140px);
     overflow: hidden; user-select: none; -webkit-user-select: none;
     touch-action: none;
   }
@@ -448,10 +448,10 @@
   .slide-num {
     flex: 0 0 33.333%; display: flex; align-items: center; justify-content: center;
     font-variant-numeric: tabular-nums;
-    font-size: clamp(20px, 6vw, 26px); font-weight: 700; color: #1d1d1f;
+    font-size: clamp(28px, 9vw, 38px); font-weight: 700; color: #1d1d1f;
     transition: opacity 0.2s, font-size 0.2s;
   }
-  .slide-num.slide-prev, .slide-num.slide-next { opacity: 0.3; font-size: clamp(15px, 4.5vw, 19px); font-weight: 500; }
+  .slide-num.slide-prev, .slide-num.slide-next { opacity: 0.3; font-size: clamp(19px, 6vw, 27px); font-weight: 500; }
   .slide-num.slide-cur { opacity: 1; }
   .slide-picker::before, .slide-picker::after {
     /* 上下渐隐遮罩，强化预览感 */
@@ -477,12 +477,12 @@
   .timer-area {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: #f5f5f7; border-radius: 20px; margin: 4px 0 8px;
-    flex: 1 1 auto; min-height: 88px; position: relative; border: 1px solid #e5e5ea;
+    flex: 1 1 auto; min-height: 64px; position: relative; border: 1px solid #e5e5ea;
     cursor: pointer; overflow: hidden;
   }
-  .timer-display { padding: clamp(2px, 1.2vh, 10px) 0; }
+  .timer-display { padding: clamp(2px, 1vh, 8px) 0; }
   .timer-number {
-    font-size: clamp(40px, 11vw, 72px); font-weight: 700; color: #34C759;
+    font-size: clamp(34px, 10vw, 58px); font-weight: 700; color: #34C759;
     font-variant-numeric: tabular-nums; letter-spacing: 2px;
     line-height: 1.1;
   }
@@ -563,8 +563,11 @@
     .num-unit { font-size: 12px; width: 20px; }
     .record-btn { padding: 10px 0; margin: 2px 0 4px; border-radius: 14px; }
     .record-btn-text { font-size: 16px; }
-    .timer-area { min-height: 48px; margin: 2px 0 4px; border-radius: 16px; }
-    .timer-number { font-size: clamp(32px, 9vw, 52px); }
+    .timer-area { min-height: 44px; margin: 2px 0 4px; border-radius: 16px; }
+    .timer-number { font-size: clamp(28px, 8.5vw, 44px); }
+    .slide-picker { height: clamp(88px, 26vw, 116px); }
+    .slide-num { font-size: clamp(24px, 8vw, 32px); }
+    .slide-num.slide-prev, .slide-num.slide-next { font-size: clamp(17px, 5.5vw, 23px); }
     .timer-hint { display: none; }
     .timer-label { font-size: 13px; }
     .bottom-actions { padding-top: 4px; }
@@ -1221,7 +1224,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 
 /* ============================================================
    数据层
