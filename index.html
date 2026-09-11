@@ -875,6 +875,7 @@
         <div class="session-info">
           <span class="si-part" id="tr-si-part">胸部</span>
           <span class="si-name" id="tr-si-name">-</span>
+          <span class="si-group" id="tr-si-groups">0/3 组</span>
         </div>
 
         <div class="adjust-area">
@@ -1210,7 +1211,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 
 /* ============================================================
    数据层
@@ -1740,9 +1741,12 @@ function loadAction(index) {
 function updateTrainingUI() {
   const a = training.currentAction;
   if (!a) return;
-  // 顶部信息条：部位 + 动作
+  // 顶部信息条：部位 + 动作 + 组数进度（已做/目标）
   document.getElementById('tr-si-part').textContent = training.bodyPart;
   document.getElementById('tr-si-name').textContent = a.name;
+  const doneLog = training.trainingLog.find(g => g.actionName === a.name);
+  const doneGroups = doneLog ? doneLog.groups.length : 0;
+  document.getElementById('tr-si-groups').textContent = `${doneGroups}/${a.targetSets ?? 3} 组`;
   // 同步滑动选择器显示
   updatePicker('weight');
   updatePicker('reps');
@@ -1836,7 +1840,7 @@ function adjustReps(delta) {
   updatePicker('reps');
 }
 
-/* 滑动手势：连续多步 + 惯性 + 橡皮筋 + 力度灵敏度（苹果生态流畅感） */
+/* 滑动手势：绝对坐标模型，跟手无阻尼，边界硬停即回，惯性 rAF 指数衰减 */
 function initPickers() {
   document.querySelectorAll('.slide-picker').forEach(picker => {
     const track = picker.querySelector('.slide-track');
@@ -1844,73 +1848,63 @@ function initPickers() {
     const cfg = pickerConfig(field);
     const adjustFn = field === 'weight' ? adjustWeight : adjustReps;
     const curVal = () => field === 'weight' ? training.weight : training.reps;
-
-    let pointerId = null;
-    let baseX = 0;        // 当前格的基准 X
-    let moved = false;    // 是否真正移动过（区分点击）
-    let inertiaTimer = null; // 惯性动画句柄（setTimeout）
-
-    // 速度采样：最近 120ms 内的位移样本
-    const samples = []; // {x, t}
-
     const itemW = () => picker.clientWidth / 3;
 
-    // 统一橡皮筋：越界位移非线性压缩（iOS 风格 x = c*d/(d+c)）
-    const rubberBand = (offset, limit) => {
-      if (offset === 0) return 0;
-      const c = limit * 0.5;
-      return (c * offset) / (Math.abs(offset) + c) * Math.sign(offset);
-    };
+    let pointerId = null;
+    let startX = 0;        // 手势起点 X（绝对坐标，全程不重置）
+    let v0 = 0;            // 手势起点数值
+    let moved = false;     // 区分点击与拖动
+    let inertiaRaf = null; // 惯性动画句柄
+    let lastSnapTimer = null;
+
+    const samples = []; // {x, t} 速度采样
 
     const applyTransform = (px) => {
+      // 跟手位移：px 已折算到 ±半格内
       track.style.transform = `translate3d(${px}px, 0, 0)`;
     };
 
+    // 由手势绝对位移计算：夹紧后的连续步进位置（单位：格）、当前应显示数值、视觉偏移
+    const computeDragState = (x) => {
+      const iw = itemW();
+      const stepsFloat = (startX - x) / iw;        // 左滑为正 = 数值增大
+      const minSteps = (cfg.min - v0) / cfg.step;  // ≤ 0
+      const maxSteps = (cfg.max - v0) / cfg.step;  // ≥ 0
+      const pos = Math.max(minSteps, Math.min(maxSteps, stepsFloat)); // 边界硬停，无过冲
+      const val = v0 + Math.round(pos) * cfg.step;
+      const visual = -(pos - Math.round(pos)) * iw; // 折算到 ±半格，连续跟手
+      return { pos, val, visual };
+    };
+
+    const cancelInertia = () => {
+      if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
+      if (lastSnapTimer) { clearTimeout(lastSnapTimer); lastSnapTimer = null; }
+      track.classList.remove('animating');
+    };
+
     const onDown = (e) => {
-      // 取消正在进行的惯性
-      if (inertiaTimer) { clearTimeout(inertiaTimer); inertiaTimer = null; }
+      cancelInertia();
       pointerId = e.pointerId;
-      baseX = e.clientX;
+      startX = e.clientX;
+      v0 = curVal();
       moved = false;
       samples.length = 0;
       samples.push({ x: e.clientX, t: performance.now() });
-      track.classList.remove('animating');
+      applyTransform(0);
       try { picker.setPointerCapture && picker.setPointerCapture(e.pointerId); } catch (_) {}
     };
 
     const onMove = (e) => {
       if (e.pointerId !== pointerId) return;
       const x = e.clientX;
-      const dx = x - baseX;
-      const iw = itemW();
-
-      // 记录样本（保留最近 120ms）
       const now = performance.now();
       samples.push({ x, t: now });
-      while (samples.length > 1 && now - samples[0].t > 120) samples.shift();
-      if (Math.abs(x - baseX) > 4) moved = true;
+      while (samples.length > 1 && now - samples[0].t > 100) samples.shift();
+      if (Math.abs(x - startX) > 4) moved = true;
 
-      // 连续步进：每跨过一格变一步
-      let ddx = dx;
-      while (ddx <= -iw && curVal() < cfg.max) {
-        adjustFn(cfg.step);
-        baseX -= iw;
-        ddx += iw;
-      }
-      while (ddx >= iw && curVal() > cfg.min) {
-        adjustFn(-cfg.step);
-        baseX += iw;
-        ddx -= iw;
-      }
-
-      // 剩余偏移：到边界用橡皮筋
-      let offset = x - baseX;
-      const atMin = curVal() <= cfg.min;
-      const atMax = curVal() >= cfg.max;
-      if ((atMin && offset > 0) || (atMax && offset < 0)) {
-        offset = rubberBand(offset, iw * 1.2);
-      }
-      applyTransform(offset);
+      const st = computeDragState(x);
+      if (st.val !== curVal()) adjustFn(st.val - curVal()); // 实时跨步更新数值
+      applyTransform(st.visual);
     };
 
     const onUp = (e) => {
@@ -1919,48 +1913,51 @@ function initPickers() {
       try { picker.releasePointerCapture && picker.releasePointerCapture(e.pointerId); } catch (_) {}
 
       const iw = itemW();
-      const offset = (samples.length ? samples[samples.length - 1].x : e.clientX) - baseX;
-      const cur = curVal();
 
-      // 松手补半步（超过半格）
-      if (offset < -iw * 0.5 && cur < cfg.max) adjustFn(cfg.step);
-      else if (offset > iw * 0.5 && cur > cfg.min) adjustFn(-cfg.step);
-
-      // 速度：最近窗口内「每 ms 跨过的格数」，dt 设下限避免同步事件导致速度爆炸
-      let stepsPerMs = 0;
+      // 速度：最近采样窗口内「格/ms」（正 = 左滑 = 数值增大）
+      let vSteps = 0;
       if (samples.length >= 2) {
         const first = samples[0], last = samples[samples.length - 1];
         const dt = Math.max(16, last.t - first.t);
-        stepsPerMs = (last.x - first.x) / iw / dt; // 格/ms（负=左滑=增）
+        vSteps = (first.x - last.x) / iw / dt;
       }
-      const speed = Math.abs(stepsPerMs);
 
-      track.classList.add('animating');
-      // 仅真正拖动且速度够快才触发惯性；纯点击/慢拖不触发
-      if (moved && speed > 0.04) {
-        // 力度越大滑得越远：额外步数 = 格速度 * 系数，上限保护
-        const extraSteps = Math.min(20, Math.round(speed * 60));
-        let steps = extraSteps;
-        const dir = stepsPerMs < 0 ? 1 : -1; // 左滑增
-        const stepInterval = 22; // ms/步，流畅连续
-        const doStep = () => {
-          if (steps <= 0) {
-            track.style.transform = 'translateX(0)';
+      const st = computeDragState(e.clientX);
+      if (moved && Math.abs(vSteps) > 0.04) {
+        // 惯性：力度→距离成正比，easeOutCubic 定点收尾，确定性无残留
+        const dir = vSteps > 0 ? 1 : -1;
+        const extra = Math.min(20, Math.round(Math.abs(vSteps) * 60)); // 快滑多走，慢滑少走
+        const minSteps = (cfg.min - v0) / cfg.step;
+        const maxSteps = (cfg.max - v0) / cfg.step;
+        const startPos = st.pos;
+        const target = Math.max(minSteps, Math.min(maxSteps, startPos + dir * extra)); // 边界硬停
+        const dur = 240 + Math.min(220, Math.abs(target - startPos) * 12);
+        const t0 = performance.now();
+
+        const frame = (t) => {
+          const p = Math.min(1, (t - t0) / dur);
+          const ease = 1 - Math.pow(1 - p, 3);
+          const pos = startPos + (target - startPos) * ease;
+          const val = v0 + Math.round(pos) * cfg.step;
+          if (val !== curVal()) adjustFn(val - curVal());
+          applyTransform(-(pos - Math.round(pos)) * iw);
+          if (p < 1) {
+            inertiaRaf = requestAnimationFrame(frame);
+          } else {
+            inertiaRaf = null;
+            track.classList.add('animating');
+            applyTransform(0); // 吸附回正
             updatePicker(field);
-            inertiaTimer = null;
-            setTimeout(() => track.classList.remove('animating'), 280);
-            return;
+            lastSnapTimer = setTimeout(() => track.classList.remove('animating'), 240);
           }
-          if (dir > 0 && curVal() < cfg.max) adjustFn(cfg.step);
-          else if (dir < 0 && curVal() > cfg.min) adjustFn(-cfg.step);
-          steps--;
-          inertiaTimer = setTimeout(doStep, stepInterval);
         };
-        doStep();
+        inertiaRaf = requestAnimationFrame(frame);
       } else {
-        track.style.transform = 'translateX(0)';
+        // 慢拖/点击：直接吸附回正（数值已实时定好）
+        track.classList.add('animating');
+        applyTransform(0);
         updatePicker(field);
-        setTimeout(() => track.classList.remove('animating'), 280);
+        lastSnapTimer = setTimeout(() => track.classList.remove('animating'), 240);
       }
     };
 
@@ -2380,35 +2377,52 @@ function bindDragEvents() {
   });
 }
 
-/* ===== 移动端：动作行 touch 排序 ===== */
+/* ===== 移动端：动作行 touch 排序 =====
+   跟手模型：视觉顶边 = 手指Y - 抓取偏移；DOM 重排后布局位置变化，
+   必须重新测量 layoutTop 再跟手，否则控件会飘离手指 */
 let actionTouch = null;
 function onActionTouchStart(e) {
   e.preventDefault();
   e.stopPropagation();
   const row = e.currentTarget.closest('.action-row');
   if (!row) return;
-  actionTouch = { row, startY: e.touches[0].clientY, moved: false };
+  const y = e.touches[0].clientY;
+  const rect = row.getBoundingClientRect(); // 尚无 transform，即布局位置
+  actionTouch = {
+    row,
+    startY: y,
+    grabOffset: y - rect.top,  // 手指相对元素顶边的偏移（全程不变）
+    layoutTop: rect.top,       // 元素当前布局顶边（重排后更新）
+    moved: false
+  };
   row.classList.add('dragging');
 }
 function onActionTouchMove(e) {
   if (!actionTouch) return;
   e.preventDefault();
   e.stopPropagation();
+  const row = actionTouch.row;
   const y = e.touches[0].clientY;
   if (Math.abs(y - actionTouch.startY) > 6) actionTouch.moved = true;
-  actionTouch.row.style.transform = `translateY(${y - actionTouch.startY}px)`;
+  // 跟手：元素钉在手指下方（保持抓取偏移）
+  const follow = () => { row.style.transform = `translateY(${y - actionTouch.grabOffset - actionTouch.layoutTop}px)`; };
+  follow();
   // 遍历同容器内的行（跳过被拖动行），用 getBoundingClientRect 匹配
   // 非拖动行没有 transform，rect 即真实布局位置
-  const container = actionTouch.row.parentElement;
+  const container = row.parentElement;
   const rows = Array.from(container.children);
-  for (const row of rows) {
-    if (row === actionTouch.row) continue;
-    const rect = row.getBoundingClientRect();
+  for (const other of rows) {
+    if (other === row) continue;
+    const rect = other.getBoundingClientRect();
     if (y >= rect.top && y <= rect.bottom) {
       const isAbove = y < rect.top + rect.height / 2;
-      if (isAbove) container.insertBefore(actionTouch.row, row);
-      else if (row.nextElementSibling) container.insertBefore(actionTouch.row, row.nextElementSibling);
-      else container.appendChild(actionTouch.row);
+      if (isAbove) container.insertBefore(row, other);
+      else if (other.nextElementSibling) container.insertBefore(row, other.nextElementSibling);
+      else container.appendChild(row);
+      // 重排后布局位置已变：清 transform 重新测量，再恢复跟手
+      row.style.transform = 'none';
+      actionTouch.layoutTop = row.getBoundingClientRect().top;
+      follow();
       break;
     }
   }
@@ -2422,34 +2436,49 @@ function onActionTouchEnd(e) {
   actionTouch = null;
 }
 
-/* ===== 移动端：部位 touch 排序 ===== */
+/* ===== 移动端：部位 touch 排序（同动作行的重锚定模型） ===== */
 let partTouch = null;
 function onPartTouchStart(e) {
   e.preventDefault();
   e.stopPropagation();
   const section = e.currentTarget.closest('.part-section');
   if (!section) return;
-  partTouch = { section, partName: section.dataset.part, startY: e.touches[0].clientY, moved: false };
+  const y = e.touches[0].clientY;
+  const rect = section.getBoundingClientRect(); // 尚无 transform，即布局位置
+  partTouch = {
+    section, partName: section.dataset.part,
+    startY: y,
+    grabOffset: y - rect.top,
+    layoutTop: rect.top,
+    moved: false
+  };
   section.classList.add('dragging');
 }
 function onPartTouchMove(e) {
   if (!partTouch) return;
   e.preventDefault();
   e.stopPropagation();
+  const section = partTouch.section;
   const y = e.touches[0].clientY;
   if (Math.abs(y - partTouch.startY) > 6) partTouch.moved = true;
-  partTouch.section.style.transform = `translateY(${y - partTouch.startY}px)`;
+  // 跟手：元素钉在手指下方（保持抓取偏移）
+  const follow = () => { section.style.transform = `translateY(${y - partTouch.grabOffset - partTouch.layoutTop}px)`; };
+  follow();
   // 遍历部位（跳过被拖动的），非拖动部位无 transform，rect 即真实布局位置
-  const container = partTouch.section.parentElement;
+  const container = section.parentElement;
   const sections = Array.from(container.children);
   for (const sec of sections) {
-    if (sec === partTouch.section) continue;
+    if (sec === section) continue;
     const rect = sec.getBoundingClientRect();
     if (y >= rect.top && y <= rect.bottom) {
       const isAbove = y < rect.top + rect.height / 2;
-      if (isAbove) container.insertBefore(partTouch.section, sec);
-      else if (sec.nextElementSibling) container.insertBefore(partTouch.section, sec.nextElementSibling);
-      else container.appendChild(partTouch.section);
+      if (isAbove) container.insertBefore(section, sec);
+      else if (sec.nextElementSibling) container.insertBefore(section, sec.nextElementSibling);
+      else container.appendChild(section);
+      // 重排后布局位置已变：清 transform 重新测量，再恢复跟手
+      section.style.transform = 'none';
+      partTouch.layoutTop = section.getBoundingClientRect().top;
+      follow();
       break;
     }
   }
