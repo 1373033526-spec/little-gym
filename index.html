@@ -426,34 +426,43 @@
   }
 
   .adjust-area { display: flex; justify-content: space-around; padding: 16px 0 12px; gap: 16px; flex-shrink: 0; }
-  .adjust-item { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
-  .adjust-label { font-size: 14px; color: #86868b; margin-bottom: 8px; }
-  /* 左右滑动选择器 */
+  .adjust-item { display: flex; flex-direction: row; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  /* 左侧标签：图标+文字纵向堆叠，垂直居中 */
+  .adjust-label {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-size: 13px; color: #86868b;
+  }
+  .adjust-label svg, .adjust-label .ic { width: 18px; height: 18px; }
+  /* 上下滑动选择器 */
   .slide-picker {
-    position: relative; width: 100%; height: clamp(52px, 15vw, 68px);
+    position: relative; flex: 1; min-width: 0; width: auto; height: clamp(72px, 20vw, 96px);
     overflow: hidden; user-select: none; -webkit-user-select: none;
     touch-action: none;
   }
   .slide-track {
-    display: flex; align-items: center; height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    height: 100%; width: 100%;
     will-change: transform;
   }
   .slide-track.animating { transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.3, 1); }
   .slide-num {
-    flex: 0 0 33.333%; text-align: center;
+    flex: 0 0 33.333%; display: flex; align-items: center; justify-content: center;
     font-variant-numeric: tabular-nums;
-    font-size: clamp(24px, 7.5vw, 32px); font-weight: 700; color: #1d1d1f;
+    font-size: clamp(20px, 6vw, 26px); font-weight: 700; color: #1d1d1f;
     transition: opacity 0.2s, font-size 0.2s;
   }
-  .slide-num.slide-prev, .slide-num.slide-next { opacity: 0.3; font-size: clamp(18px, 5.5vw, 24px); font-weight: 500; }
+  .slide-num.slide-prev, .slide-num.slide-next { opacity: 0.3; font-size: clamp(15px, 4.5vw, 19px); font-weight: 500; }
   .slide-num.slide-cur { opacity: 1; }
   .slide-picker::before, .slide-picker::after {
-    /* 左右渐隐遮罩，强化预览感 */
-    content: ''; position: absolute; top: 0; bottom: 0; width: 24px; pointer-events: none; z-index: 1;
+    /* 上下渐隐遮罩，强化预览感 */
+    content: ''; position: absolute; left: 0; right: 0; height: 18px; pointer-events: none; z-index: 1;
   }
-  .slide-picker::before { left: 0; background: linear-gradient(90deg, #fff 10%, transparent); }
-  .slide-picker::after { right: 0; background: linear-gradient(270deg, #fff 10%, transparent); }
-  .num-unit { font-size: 13px; color: #aeaeb2; margin-top: 4px; }
+  .slide-picker::before { top: 0; background: linear-gradient(180deg, #fff 10%, transparent); }
+  .slide-picker::after { bottom: 0; background: linear-gradient(0deg, #fff 10%, transparent); }
+  .num-unit {
+    flex: 0 0 auto; width: 24px; text-align: left;
+    font-size: 13px; color: #aeaeb2;
+  }
 
   .record-btn {
     width: 100%; padding: 16px 0; border-radius: 16px;
@@ -547,10 +556,11 @@
     .si-part, .si-group { padding: 2px 9px; }
     .si-name { font-size: 15px; }
     .adjust-area { padding: 6px 0 4px; gap: 10px; }
-    .adjust-label { margin-bottom: 4px; font-size: 12px; }
+    .adjust-label { font-size: 12px; gap: 2px; }
+    .adjust-label svg, .adjust-label .ic { width: 15px; height: 15px; }
     .num-btn { width: clamp(30px, 9vw, 36px); height: clamp(30px, 9vw, 36px); font-size: 18px; }
     .num-display { font-size: clamp(22px, 7vw, 26px); }
-    .num-unit { margin-top: 2px; font-size: 12px; }
+    .num-unit { font-size: 12px; width: 20px; }
     .record-btn { padding: 10px 0; margin: 2px 0 4px; border-radius: 14px; }
     .record-btn-text { font-size: 16px; }
     .timer-area { min-height: 48px; margin: 2px 0 4px; border-radius: 16px; }
@@ -880,7 +890,7 @@
 
         <div class="adjust-area">
           <div class="adjust-item">
-            <div class="adjust-label"><i data-ic="weight"></i> 重量</div>
+            <div class="adjust-label"><i data-ic="weight"></i><span>重量</span></div>
             <div class="slide-picker" id="picker-weight" data-field="weight" data-step="2.5" data-min="0" data-max="500">
               <div class="slide-track">
                 <span class="slide-num slide-prev"></span>
@@ -891,7 +901,7 @@
             <div class="num-unit">kg</div>
           </div>
           <div class="adjust-item">
-            <div class="adjust-label"><i data-ic="hash"></i> 次数</div>
+            <div class="adjust-label"><i data-ic="hash"></i><span>次数</span></div>
             <div class="slide-picker" id="picker-reps" data-field="reps" data-step="1" data-min="0" data-max="99">
               <div class="slide-track">
                 <span class="slide-num slide-prev"></span>
@@ -1211,7 +1221,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.11.0';
 
 /* ============================================================
    数据层
@@ -1840,7 +1850,8 @@ function adjustReps(delta) {
   updatePicker('reps');
 }
 
-/* 滑动手势：绝对坐标模型，跟手无阻尼，边界硬停即回，惯性 rAF 指数衰减 */
+/* 滑动手势（上下滚动）：绝对坐标模型，跟手无阻尼，边界硬停即回，惯性 easeOut 定点收尾
+   上滑 = 数值增大，下滑 = 数值减小 */
 function initPickers() {
   document.querySelectorAll('.slide-picker').forEach(picker => {
     const track = picker.querySelector('.slide-track');
@@ -1848,31 +1859,31 @@ function initPickers() {
     const cfg = pickerConfig(field);
     const adjustFn = field === 'weight' ? adjustWeight : adjustReps;
     const curVal = () => field === 'weight' ? training.weight : training.reps;
-    const itemW = () => picker.clientWidth / 3;
+    const itemH = () => picker.clientHeight / 3;
 
     let pointerId = null;
-    let startX = 0;        // 手势起点 X（绝对坐标，全程不重置）
+    let startY = 0;        // 手势起点 Y（绝对坐标，全程不重置）
     let v0 = 0;            // 手势起点数值
     let moved = false;     // 区分点击与拖动
     let inertiaRaf = null; // 惯性动画句柄
     let lastSnapTimer = null;
 
-    const samples = []; // {x, t} 速度采样
+    const samples = []; // {y, t} 速度采样
 
     const applyTransform = (px) => {
       // 跟手位移：px 已折算到 ±半格内
-      track.style.transform = `translate3d(${px}px, 0, 0)`;
+      track.style.transform = `translate3d(0, ${px}px, 0)`;
     };
 
     // 由手势绝对位移计算：夹紧后的连续步进位置（单位：格）、当前应显示数值、视觉偏移
-    const computeDragState = (x) => {
-      const iw = itemW();
-      const stepsFloat = (startX - x) / iw;        // 左滑为正 = 数值增大
+    const computeDragState = (y) => {
+      const ih = itemH();
+      const stepsFloat = (startY - y) / ih;        // 上滑为正 = 数值增大
       const minSteps = (cfg.min - v0) / cfg.step;  // ≤ 0
       const maxSteps = (cfg.max - v0) / cfg.step;  // ≥ 0
       const pos = Math.max(minSteps, Math.min(maxSteps, stepsFloat)); // 边界硬停，无过冲
       const val = v0 + Math.round(pos) * cfg.step;
-      const visual = -(pos - Math.round(pos)) * iw; // 折算到 ±半格，连续跟手
+      const visual = -(pos - Math.round(pos)) * ih; // 折算到 ±半格，连续跟手
       return { pos, val, visual };
     };
 
@@ -1885,24 +1896,24 @@ function initPickers() {
     const onDown = (e) => {
       cancelInertia();
       pointerId = e.pointerId;
-      startX = e.clientX;
+      startY = e.clientY;
       v0 = curVal();
       moved = false;
       samples.length = 0;
-      samples.push({ x: e.clientX, t: performance.now() });
+      samples.push({ y: e.clientY, t: performance.now() });
       applyTransform(0);
       try { picker.setPointerCapture && picker.setPointerCapture(e.pointerId); } catch (_) {}
     };
 
     const onMove = (e) => {
       if (e.pointerId !== pointerId) return;
-      const x = e.clientX;
+      const y = e.clientY;
       const now = performance.now();
-      samples.push({ x, t: now });
+      samples.push({ y, t: now });
       while (samples.length > 1 && now - samples[0].t > 100) samples.shift();
-      if (Math.abs(x - startX) > 4) moved = true;
+      if (Math.abs(y - startY) > 4) moved = true;
 
-      const st = computeDragState(x);
+      const st = computeDragState(y);
       if (st.val !== curVal()) adjustFn(st.val - curVal()); // 实时跨步更新数值
       applyTransform(st.visual);
     };
@@ -1912,17 +1923,17 @@ function initPickers() {
       pointerId = null;
       try { picker.releasePointerCapture && picker.releasePointerCapture(e.pointerId); } catch (_) {}
 
-      const iw = itemW();
+      const ih = itemH();
 
-      // 速度：最近采样窗口内「格/ms」（正 = 左滑 = 数值增大）
+      // 速度：最近采样窗口内「格/ms」（正 = 上滑 = 数值增大）
       let vSteps = 0;
       if (samples.length >= 2) {
         const first = samples[0], last = samples[samples.length - 1];
         const dt = Math.max(16, last.t - first.t);
-        vSteps = (first.x - last.x) / iw / dt;
+        vSteps = (first.y - last.y) / ih / dt;
       }
 
-      const st = computeDragState(e.clientX);
+      const st = computeDragState(e.clientY);
       if (moved && Math.abs(vSteps) > 0.04) {
         // 惯性：力度→距离成正比，easeOutCubic 定点收尾，确定性无残留
         const dir = vSteps > 0 ? 1 : -1;
@@ -1940,7 +1951,7 @@ function initPickers() {
           const pos = startPos + (target - startPos) * ease;
           const val = v0 + Math.round(pos) * cfg.step;
           if (val !== curVal()) adjustFn(val - curVal());
-          applyTransform(-(pos - Math.round(pos)) * iw);
+          applyTransform(-(pos - Math.round(pos)) * ih);
           if (p < 1) {
             inertiaRaf = requestAnimationFrame(frame);
           } else {
@@ -1965,7 +1976,7 @@ function initPickers() {
     picker.addEventListener('pointermove', onMove);
     picker.addEventListener('pointerup', onUp);
     picker.addEventListener('pointercancel', onUp);
-    // 阻止触摸滚动干扰横向滑动
+    // 阻止触摸滚动干扰纵向滑动
     picker.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
   });
 }
