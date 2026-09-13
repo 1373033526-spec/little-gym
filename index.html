@@ -1224,7 +1224,7 @@ function getOrderedParts() {
    设置页底部展示该版本号，用于确认手机上是否已是最新版。
    规则：新功能/界面改动升次版本(1.1→1.2)，修复升修订号(1.1.0→1.1.1)
    ============================================================ */
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.1';
 
 /* ============================================================
    数据层
@@ -1733,11 +1733,10 @@ function loadAction(index) {
   const groupCount = existingLog ? existingLog.groups.length : 0;
   clearTimers();
   training.currentAction = action;
-  // 按组数使用 setsConfig 配置
-  const setIdx = groupCount; // 当前要做的组索引（0-based）
-  const sc = action.setsConfig && action.setsConfig[setIdx];
-  training.weight = sc ? sc.weight : action.defaultWeight;
-  training.reps = sc ? sc.reps : action.defaultReps;
+  // 按组数使用 setsConfig 配置（本组默认值；用户手动调整后以调整值为准）
+  const d = groupDefaults(action, groupCount + 1);
+  training.weight = d.weight;
+  training.reps = d.reps;
   training.currentGroup = groupCount + 1;
   training.totalGroups = groupCount + 1;
   training.phase = 'idle';
@@ -1984,6 +1983,13 @@ function initPickers() {
   });
 }
 
+/* 取某组（groupNum 从1开始）的后台默认重量次数：有 setsConfig 用配置，否则用动作默认值 */
+function groupDefaults(action, groupNum) {
+  const sc = action.setsConfig && action.setsConfig[groupNum - 1];
+  return sc ? { weight: sc.weight, reps: sc.reps }
+            : { weight: action.defaultWeight, reps: action.defaultReps };
+}
+
 function recordGroup() {
   const { currentAction, weight, reps, currentGroup, trainingLog, trainingSeconds } = training;
   let existing = trainingLog.find(g => g.actionName === currentAction.name);
@@ -1998,6 +2004,12 @@ function recordGroup() {
   }
   training.currentGroup = currentGroup + 1;
   training.totalGroups = currentGroup + 1;
+  // 下一组恢复为后台默认值（休息期间展示）；若用户在休息/准备期间手动调整，则以调整值为准
+  const d = groupDefaults(currentAction, training.currentGroup);
+  training.weight = d.weight;
+  training.reps = d.reps;
+  updatePicker('weight');
+  updatePicker('reps');
 }
 
 /* ===== 状态机主按钮（严格串行：同一时刻只有一个计时器） ===== */
@@ -2016,13 +2028,7 @@ function toggleTraining() {
 /* 启动开始倒计时（单一定时器） */
 function startPrepareTimer() {
   clearActiveInterval();
-  // 加载下一组的 setsConfig 重量次数
-  const setIdx = training.currentGroup - 1; // 0-based
-  const sc = training.currentAction.setsConfig && training.currentAction.setsConfig[setIdx];
-  if (sc) {
-    training.weight = sc.weight;
-    training.reps = sc.reps;
-  }
+  // 重量次数以计时页当前值为准（loadAction/recordGroup 已初始化默认值，手动调整保留不覆盖）
   // 全局准备倒计时开关：关闭则直接进入训练正计时
   if (!isPrepareEnabled()) {
     startTrainingTimer();
@@ -2257,7 +2263,7 @@ function clearTimers() {
    设置页：手风琴 + 拖拽排序
    ============================================================ */
 let editingId = null;
-const expandedParts = new Set(['胸部']); // 默认展开胸部
+const expandedParts = new Set(); // 默认全部收起，刷新后不自动展开任何部位
 let draggedActionId = null;
 
 function togglePartSection(part) {
